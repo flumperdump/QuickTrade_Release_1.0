@@ -1,1 +1,2 @@
-Welcome to QuickTrade. Run 'main.py' to launch the app.
+# QuickTrade - Manual Crypto Trading App
+See full instructions in GitHub.
