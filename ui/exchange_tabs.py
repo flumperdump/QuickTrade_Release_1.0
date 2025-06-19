@@ -1,42 +1,62 @@
 # ui/exchange_tabs.py
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QComboBox, QLineEdit, QPushButton, QHBoxLayout, QMessageBox
+from core.trade_executor import TradeExecutor
 
-class ExchangeTab(QWidget):
-    def __init__(self, exchange_name):
-        super().__init__()
-        self.exchange_name = exchange_name
-        self.init_ui()
+executor = TradeExecutor()
 
-    def init_ui(self):
-        layout = QVBoxLayout()
+def create_exchange_tabs(selected_exchanges):
+    tabs = {}
 
-        self.market_selector = QComboBox()
-        self.market_selector.addItems(["BTC/USDT", "ETH/USDT", "SOL/USDT"])
-        layout.addWidget(self.market_selector)
+    for exchange in selected_exchanges:
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
 
-        self.order_type = QComboBox()
-        self.order_type.addItems(["Market", "Limit"])
-        layout.addWidget(self.order_type)
+        layout.addWidget(QLabel(f"{exchange} Trading Interface"))
 
-        self.price_input = QLineEdit()
-        self.price_input.setPlaceholderText("Price (Limit Only)")
-        layout.addWidget(self.price_input)
+        pair_selector = QComboBox()
+        pair_selector.addItems(["BTC/USDT", "ETH/USDT", "SOL/USDT"])
+        layout.addWidget(pair_selector)
 
-        self.amount_input = QLineEdit()
-        self.amount_input.setPlaceholderText("Amount")
-        layout.addWidget(self.amount_input)
+        order_type = QComboBox()
+        order_type.addItems(["Market", "Limit"])
+        layout.addWidget(order_type)
+
+        price_input = QLineEdit()
+        price_input.setPlaceholderText("Price (Limit only)")
+        layout.addWidget(price_input)
+
+        amount_input = QLineEdit()
+        amount_input.setPlaceholderText("Amount")
+        layout.addWidget(amount_input)
 
         button_layout = QHBoxLayout()
         buy_button = QPushButton("Buy")
         sell_button = QPushButton("Sell")
-        buy_button.clicked.connect(lambda: self.execute_order("Buy"))
-        sell_button.clicked.connect(lambda: self.execute_order("Sell"))
         button_layout.addWidget(buy_button)
         button_layout.addWidget(sell_button)
-
         layout.addLayout(button_layout)
-        self.setLayout(layout)
 
-    def execute_order(self, side):
-        QMessageBox.information(self, "Order Submitted", f"{side} order submitted on {self.exchange_name}")
+        def handle_trade(side):
+            symbol = pair_selector.currentText()
+            typ = order_type.currentText()
+            price = price_input.text() if typ == "Limit" else None
+            amount = amount_input.text()
+
+            executor.place_order(
+                parent_widget=tab,
+                exchange=exchange,
+                subaccount="Main",  # Placeholder
+                symbol=symbol,
+                side=side,
+                amount=amount,
+                order_type=typ,
+                price=price
+            )
+
+        buy_button.clicked.connect(lambda: handle_trade("Buy"))
+        sell_button.clicked.connect(lambda: handle_trade("Sell"))
+
+        tabs[exchange] = tab
+
+    return tabs
