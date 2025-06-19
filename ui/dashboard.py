@@ -1,44 +1,35 @@
-# ui/dashboard.py
-
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QCheckBox, QHBoxLayout
-import json
-import os
-
-CONFIG_PATH = "config"
-USER_PREFS_FILE = os.path.join(CONFIG_PATH, "user_prefs.json")
-API_KEYS_FILE = os.path.join(CONFIG_PATH, "api_keys.json")
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QHBoxLayout, QTableWidget, QTableWidgetItem
+from PyQt6.QtCore import Qt
 
 class DashboardTab(QWidget):
     def __init__(self):
         super().__init__()
-        self.setLayout(QVBoxLayout())
+        layout = QVBoxLayout()
+        self.setLayout(layout)
 
         self.total_label = QLabel("💰 Total Asset Value: USD $0.00")
         self.total_label.setStyleSheet("font-size: 18px; font-weight: bold;")
-        self.layout().addWidget(self.total_label)
+        layout.addWidget(self.total_label)
 
         controls_layout = QHBoxLayout()
         self.dust_filter = QCheckBox("Show Dust (<$1)")
-        self.dust_filter.setChecked(False)
         self.dust_filter.stateChanged.connect(self.update_table)
-
         self.refresh_button = QPushButton("🔁 Refresh Assets")
         self.refresh_button.clicked.connect(self.load_balances)
-
         controls_layout.addWidget(self.dust_filter)
         controls_layout.addWidget(self.refresh_button)
         controls_layout.addStretch()
-        self.layout().addLayout(controls_layout)
+        layout.addLayout(controls_layout)
 
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["Exchange", "Subaccount", "Asset", "Balance (USD)"])
-        self.layout().addWidget(self.table)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        layout.addWidget(self.table)
 
         self.balances = []
         self.load_balances()
 
     def load_balances(self):
-        # Dummy data for now
         self.balances = [
             {"exchange": "Binance", "subaccount": "Main", "asset": "BTC", "usd_value": 23450.12},
             {"exchange": "Kraken", "subaccount": "Bot1", "asset": "ETH", "usd_value": 1345.33},
