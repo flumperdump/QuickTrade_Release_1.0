@@ -3,7 +3,21 @@ import logging
 from core.models import TradeRequest
 
 # Set up logging
-logging.basicConfig(filename='logs/trade_executor.log', level=logging.INFO, format='%(asctime)s - %(message)s')
+import os
+import logging
+
+# Ensure external writable directory for logs
+log_dir = os.path.join(os.path.expanduser("~"), "QuickTradeLogs")
+os.makedirs(log_dir, exist_ok=True)
+
+log_file = os.path.join(log_dir, "trade_executor.log")
+
+logging.basicConfig(
+    filename=log_file,
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
 
 class TradeExecutor:
     def __init__(self):
