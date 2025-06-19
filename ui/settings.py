@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox,
     QGroupBox, QGridLayout, QLineEdit, QMessageBox, QScrollArea, QHBoxLayout,
-    QFormLayout, QListWidget, QListWidgetItem, QDialog, QDialogButtonBox, QToolButton
+    QFormLayout, QListWidget, QListWidgetItem, QDialog, QDialogButtonBox
 )
 from PyQt6.QtCore import Qt
 import json
@@ -46,12 +46,10 @@ class ExchangeSelectionDialog(QDialog):
         return [self.exchange_list.item(i).text() for i in range(self.exchange_list.count()) if self.exchange_list.item(i).isSelected()]
 
 class SettingsTab(QWidget):
-    def __init__(self, refresh_ui_callback=None):
+    def __init__(self):
         super().__init__()
-        self.refresh_ui_callback = refresh_ui_callback
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
         self.container = QWidget()
         self.container.setLayout(QVBoxLayout())
 
@@ -67,37 +65,46 @@ class SettingsTab(QWidget):
         self.api_layout = QVBoxLayout()
         self.api_forms = {}
 
-        self.render_exchange_sections()
-
         self.api_box.setLayout(self.api_layout)
         self.container.layout().addWidget(self.api_box)
 
-        scroll.setWidget(self.container)
+        self.scroll.setWidget(self.container)
         layout = QVBoxLayout()
-        layout.addWidget(scroll)
+        layout.addWidget(self.scroll)
         self.setLayout(layout)
 
+        self.render_exchange_sections()
+
     def render_exchange_sections(self):
+        # Clear old widgets
+        while self.api_layout.count():
+            child = self.api_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
         for ex in self.selected_exchanges:
             exchange_box = QGroupBox(ex)
+            exchange_box.setCheckable(False)
             exchange_layout = QVBoxLayout()
 
             subaccounts = self.api_data.get(ex, {})
             for subaccount, creds in subaccounts.items():
                 sub_box = QGroupBox(subaccount)
+                sub_box.setCheckable(False)
                 sub_layout = QFormLayout()
 
-                rename_input = QLineEdit(subaccount)
-                rename_input.setPlaceholderText("Rename Subaccount")
+                name_input = QLineEdit(subaccount)
+                name_input.setPlaceholderText("Subaccount Name")
+                name_input.textChanged.connect(lambda new_name, e=ex, old=subaccount: self.rename_subaccount(e, old, new_name))
 
                 api_key_input = QLineEdit(creds.get("api_key", ""))
                 api_secret_input = QLineEdit(creds.get("api_secret", ""))
                 api_secret_input.setEchoMode(QLineEdit.EchoMode.Password)
 
                 save_btn = QPushButton("Save")
-                save_btn.clicked.connect(lambda _, e=ex, r=rename_input, k=api_key_input, s=api_secret_input, old=subaccount: self.save_api(e, r, k, s, old))
+                save_btn.clicked.connect(lambda _, e=ex, s=subaccount, k=api_key_input, sec=api_secret_input: self.save_api(e, s, k, sec))
 
-                sub_layout.addRow("Rename:", rename_input)
+                sub_layout.addRow("Subaccount:", name_input)
                 sub_layout.addRow("API Key:", api_key_input)
                 sub_layout.addRow("API Secret:", api_secret_input)
                 sub_layout.addRow(save_btn)
@@ -111,6 +118,11 @@ class SettingsTab(QWidget):
             exchange_box.setLayout(exchange_layout)
             self.api_layout.addWidget(exchange_box)
 
+        self.api_box.update()
+        self.container.update()
+        self.scroll.update()
+        self.update()
+
     def choose_exchanges(self):
         dialog = ExchangeSelectionDialog(self.selected_exchanges)
         if dialog.exec():
@@ -119,41 +131,44 @@ class SettingsTab(QWidget):
             os.makedirs("config", exist_ok=True)
             with open(CONFIG_PATH, 'w') as f:
                 json.dump({"enabled_exchanges": selected}, f, indent=2)
-            QMessageBox.information(self, "Saved", "Exchange selection saved. UI will refresh.")
-            if self.refresh_ui_callback:
-                self.refresh_ui_callback()
+            self.render_exchange_sections()
 
-    def save_api(self, exchange, rename_input, key_input, secret_input, old_name):
-        new_name = rename_input.text().strip()
+    def save_api(self, exchange, subaccount, key_input, secret_input):
         key = key_input.text().strip()
         secret = secret_input.text().strip()
 
-        if not key or not secret or not new_name:
-            QMessageBox.warning(self, "Missing Info", "API key, secret, and subaccount name cannot be empty.")
+        if not key or not secret:
+            QMessageBox.warning(self, "Missing Info", "API key and secret cannot be empty.")
             return
 
         os.makedirs("config", exist_ok=True)
         if exchange not in self.api_data:
             self.api_data[exchange] = {}
 
-        # Handle renaming
-        if old_name != new_name:
-            self.api_data[exchange].pop(old_name, None)
-        self.api_data[exchange][new_name] = {"api_key": key, "api_secret": secret}
-
+        self.api_data[exchange][subaccount] = {"api_key": key, "api_secret": secret}
         with open(API_KEYS_PATH, 'w') as f:
             json.dump(self.api_data, f, indent=2)
-
-        QMessageBox.information(self, "Saved", f"API keys for {exchange} → {new_name} saved.")
 
     def add_subaccount(self, exchange):
-        subaccount = f"Sub{len(self.api_data.get(exchange, {})) + 1}"
-        if exchange not in self.api_data:
-            self.api_data[exchange] = {}
-        self.api_data[exchange][subaccount] = {"api_key": "", "api_secret": ""}
+        subaccounts = self.api_data.get(exchange, {})
+        i = 1
+        new_label = f"Sub{i}"
+        while new_label in subaccounts:
+            i += 1
+            new_label = f"Sub{i}"
+
+        self.api_data.setdefault(exchange, {})[new_label] = {"api_key": "", "api_secret": ""}
         with open(API_KEYS_PATH, 'w') as f:
             json.dump(self.api_data, f, indent=2)
-        QMessageBox.information(self, "Added", f"Subaccount {subaccount} added to {exchange}. Please re-open Settings tab to see changes.")
+        self.render_exchange_sections()
+
+    def rename_subaccount(self, exchange, old_name, new_name):
+        if old_name != new_name and new_name:
+            exchange_data = self.api_data.get(exchange, {})
+            if old_name in exchange_data:
+                exchange_data[new_name] = exchange_data.pop(old_name)
+                with open(API_KEYS_PATH, 'w') as f:
+                    json.dump(self.api_data, f, indent=2)
 
     def load_config(self):
         if os.path.exists(CONFIG_PATH):
