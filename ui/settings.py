@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QMessageBox,
     QScrollArea, QHBoxLayout, QFormLayout, QListWidget, QListWidgetItem, QDialog,
-    QDialogButtonBox, QGroupBox
+    QDialogButtonBox, QGroupBox, QToolButton, QSizePolicy, QFrame
 )
 from PyQt6.QtCore import Qt
 import json
@@ -45,6 +45,32 @@ class ExchangeSelectionDialog(QDialog):
     def get_selected(self):
         return [self.exchange_list.item(i).text() for i in range(self.exchange_list.count()) if self.exchange_list.item(i).isSelected()]
 
+class CollapsibleBox(QGroupBox):
+    def __init__(self, title):
+        super().__init__()
+        self.setTitle("")
+        self.toggle_button = QToolButton(text=title, checkable=True, checked=True)
+        self.toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.toggle_button.setArrowType(Qt.ArrowType.DownArrow)
+        self.toggle_button.clicked.connect(self.toggle_content)
+
+        self.content = QWidget()
+        self.content.setLayout(QVBoxLayout())
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.toggle_button)
+        layout.addWidget(self.content)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
+
+    def toggle_content(self):
+        visible = not self.content.isVisible()
+        self.content.setVisible(visible)
+        self.toggle_button.setArrowType(Qt.ArrowType.DownArrow if visible else Qt.ArrowType.RightArrow)
+
+    def add_widget(self, widget):
+        self.content.layout().addWidget(widget)
+
 class SettingsTab(QWidget):
     def __init__(self, on_exchanges_updated=None):
         super().__init__()
@@ -57,7 +83,7 @@ class SettingsTab(QWidget):
 
         self.user_prefs = self.load_config()
         self.api_data = self.load_api_keys()
-        self.selected_exchanges = self.user_prefs.get("enabled_exchanges", SUPPORTED_EXCHANGES)
+        self.selected_exchanges = self.user_prefs.get("enabled_exchanges", [])
 
         choose_btn = QPushButton("Choose Exchanges")
         choose_btn.clicked.connect(self.choose_exchanges)
@@ -83,8 +109,7 @@ class SettingsTab(QWidget):
                 widget.deleteLater()
 
         for ex in self.selected_exchanges:
-            exchange_box = QGroupBox(ex)
-            exchange_box.setLayout(QVBoxLayout())
+            exchange_box = CollapsibleBox(ex)
 
             subaccounts = self.api_data.get(ex, {})
             for subaccount, creds in subaccounts.items():
@@ -152,11 +177,11 @@ class SettingsTab(QWidget):
                 h.addWidget(save_btn)
                 h.addWidget(edit_btn)
                 sub_box.layout().addRow(h)
-                exchange_box.layout().addWidget(sub_box)
+                exchange_box.add_widget(sub_box)
 
             add_sub_btn = QPushButton(f"Add Subaccount to {ex}")
             add_sub_btn.clicked.connect(lambda _, e=ex: self.add_subaccount(e))
-            exchange_box.layout().addWidget(add_sub_btn)
+            exchange_box.add_widget(add_sub_btn)
             self.api_layout.addWidget(exchange_box)
 
     def choose_exchanges(self):
