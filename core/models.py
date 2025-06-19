@@ -1,34 +1,13 @@
-# models.py
+# core/models.py
 
-from dataclasses import dataclass, field
-from typing import Dict, List
-
+from dataclasses import dataclass
 
 @dataclass
-class APICredentials:
-    """Holds the API credentials for a subaccount."""
-    api_key: str
-    api_secret: str
-
-
-@dataclass
-class SubAccount:
-    """Represents a subaccount within an exchange."""
-    name: str
-    credentials: APICredentials
-
-
-@dataclass
-class ExchangeConfig:
-    """Represents the API configuration for an exchange."""
-    name: str
-    subaccounts: Dict[str, SubAccount] = field(default_factory=dict)
-
-
-@dataclass
-class UserPreferences:
-    """Stores user-level preferences that persist across sessions."""
-    enabled_exchanges: List[str] = field(default_factory=list)
-    display_currency: str = "USD"
-    show_dust: bool = False
-    theme: str = "dark"  # options: "dark", "light"
+class TradeRequest:
+    exchange: str
+    subaccount: str
+    symbol: str
+    side: str  # "Buy" or "Sell"
+    amount: float
+    order_type: str  # "Market" or "Limit"
+    price: float = None
