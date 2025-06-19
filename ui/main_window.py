@@ -1,3 +1,5 @@
+# main_window.py
+
 from PyQt6.QtWidgets import QMainWindow, QTabWidget
 from ui.dashboard import DashboardTab
 from ui.settings import SettingsTab
