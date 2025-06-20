@@ -61,7 +61,6 @@ class CollapsibleBox(QGroupBox):
         layout.addWidget(self.toggle_button)
         layout.addWidget(self.content)
         layout.setContentsMargins(0, 0, 0, 0)
-        self.setLayout(layout)
 
     def toggle_content(self):
         visible = not self.content.isVisible()
@@ -113,81 +112,94 @@ class SettingsTab(QWidget):
 
             subaccounts = self.api_data.get(ex, {})
             for subaccount, creds in subaccounts.items():
-                self.create_subaccount_widget(exchange_box, ex, subaccount, creds, editable=False)
+                sub_box = QGroupBox()
+                sub_box.setLayout(QFormLayout())
+
+                is_new = creds.get("api_key", "") == "" and creds.get("api_secret", "") == ""
+
+                sub_name_input = QLineEdit(subaccount)
+                sub_name_input.setDisabled(not is_new)
+
+                api_key_input = QLineEdit(creds.get("api_key", ""))
+                api_key_input.setDisabled(not is_new)
+                api_secret_input = QLineEdit(creds.get("api_secret", ""))
+                api_secret_input.setEchoMode(QLineEdit.EchoMode.Password)
+                api_secret_input.setDisabled(not is_new)
+
+                save_btn = QPushButton("Save")
+                edit_btn = QPushButton("Edit")
+                delete_btn = QPushButton("Delete")
+
+                def make_save_func(ex=ex, sub=subaccount, name_input=sub_name_input, k=api_key_input, s=api_secret_input, e_btn=edit_btn):
+                    def save():
+                        new_name = name_input.text().strip()
+                        key = k.text().strip()
+                        secret = s.text().strip()
+
+                        if not new_name or not key or not secret:
+                            QMessageBox.warning(self, "Missing Info", "All fields must be filled.")
+                            return
+
+                        if new_name != sub:
+                            self.api_data[ex].pop(sub, None)
+                            subaccount_key = new_name
+                        else:
+                            subaccount_key = sub
+
+                        self.api_data[ex][subaccount_key] = {"api_key": key, "api_secret": secret}
+                        with open(API_KEYS_PATH, 'w') as f:
+                            json.dump(self.api_data, f, indent=2)
+
+                        name_input.setDisabled(True)
+                        k.setDisabled(True)
+                        s.setDisabled(True)
+                        e_btn.setDisabled(False)
+                        save_btn.setDisabled(True)
+
+                        QMessageBox.information(self, "Saved", f"Keys for {ex} → {subaccount_key} saved.")
+                    return save
+
+                def make_edit_func():
+                    def edit():
+                        sub_name_input.setDisabled(False)
+                        api_key_input.setDisabled(False)
+                        api_secret_input.setDisabled(False)
+                        save_btn.setDisabled(False)
+                        edit_btn.setDisabled(True)
+                    return edit
+
+                def make_delete_func(ex=ex, sub=subaccount):
+                    def delete():
+                        if ex in self.api_data and sub in self.api_data[ex]:
+                            self.api_data[ex].pop(sub)
+                            with open(API_KEYS_PATH, 'w') as f:
+                                json.dump(self.api_data, f, indent=2)
+                            self.render_exchange_sections()
+                    return delete
+
+                save_btn.clicked.connect(make_save_func())
+                delete_btn.clicked.connect(make_delete_func())
+
+                if not is_new:
+                    edit_btn.clicked.connect(make_edit_func())
+                    save_btn.setDisabled(True)
+                else:
+                    edit_btn.setVisible(False)
+
+                sub_box.layout().addRow("Subaccount Name:", sub_name_input)
+                sub_box.layout().addRow("API Key:", api_key_input)
+                sub_box.layout().addRow("API Secret:", api_secret_input)
+                h = QHBoxLayout()
+                h.addWidget(save_btn)
+                h.addWidget(edit_btn)
+                h.addWidget(delete_btn)
+                sub_box.layout().addRow(h)
+                exchange_box.add_widget(sub_box)
 
             add_sub_btn = QPushButton(f"Add Subaccount to {ex}")
             add_sub_btn.clicked.connect(lambda _, e=ex: self.add_subaccount(e))
             exchange_box.add_widget(add_sub_btn)
             self.api_layout.addWidget(exchange_box)
-
-    def create_subaccount_widget(self, exchange_box, ex, subaccount, creds, editable):
-        sub_box = QGroupBox()
-        sub_box.setLayout(QFormLayout())
-
-        sub_name_input = QLineEdit(subaccount)
-        sub_name_input.setDisabled(not editable)
-
-        api_key_input = QLineEdit(creds.get("api_key", ""))
-        api_key_input.setDisabled(not editable)
-        api_secret_input = QLineEdit(creds.get("api_secret", ""))
-        api_secret_input.setEchoMode(QLineEdit.EchoMode.Password)
-        api_secret_input.setDisabled(not editable)
-
-        save_btn = QPushButton("Save")
-        edit_btn = QPushButton("Edit")
-        delete_btn = QPushButton("Delete")
-
-        def save():
-            new_name = sub_name_input.text().strip()
-            key = api_key_input.text().strip()
-            secret = api_secret_input.text().strip()
-            if not new_name or not key or not secret:
-                QMessageBox.warning(self, "Missing Info", "All fields must be filled.")
-                return
-            if new_name != subaccount:
-                self.api_data[ex].pop(subaccount, None)
-                subaccount_key = new_name
-            else:
-                subaccount_key = subaccount
-            self.api_data[ex][subaccount_key] = {"api_key": key, "api_secret": secret}
-            with open(API_KEYS_PATH, 'w') as f:
-                json.dump(self.api_data, f, indent=2)
-            sub_name_input.setDisabled(True)
-            api_key_input.setDisabled(True)
-            api_secret_input.setDisabled(True)
-            save_btn.setDisabled(True)
-            edit_btn.setDisabled(False)
-            QMessageBox.information(self, "Saved", f"Keys for {ex} → {subaccount_key} saved.")
-
-        def edit():
-            sub_name_input.setDisabled(False)
-            api_key_input.setDisabled(False)
-            api_secret_input.setDisabled(False)
-            save_btn.setDisabled(False)
-            edit_btn.setDisabled(True)
-
-        def delete():
-            self.api_data[ex].pop(subaccount, None)
-            with open(API_KEYS_PATH, 'w') as f:
-                json.dump(self.api_data, f, indent=2)
-            self.render_exchange_sections()
-
-        save_btn.clicked.connect(save)
-        edit_btn.clicked.connect(edit)
-        delete_btn.clicked.connect(delete)
-
-        h = QHBoxLayout()
-        h.addWidget(save_btn)
-        if not editable:
-            h.addWidget(edit_btn)
-        h.addWidget(delete_btn)
-
-        sub_box.layout().addRow("Subaccount Name:", sub_name_input)
-        sub_box.layout().addRow("API Key:", api_key_input)
-        sub_box.layout().addRow("API Secret:", api_secret_input)
-        sub_box.layout().addRow(h)
-
-        exchange_box.add_widget(sub_box)
 
     def choose_exchanges(self):
         dialog = ExchangeSelectionDialog(self.selected_exchanges)
@@ -202,15 +214,13 @@ class SettingsTab(QWidget):
                 self.on_exchanges_updated()
 
     def add_subaccount(self, exchange):
+        subaccount = f"Sub{len(self.api_data.get(exchange, {})) + 1}"
         if exchange not in self.api_data:
             self.api_data[exchange] = {}
-        subaccount = f"Sub{len(self.api_data[exchange]) + 1}"
         self.api_data[exchange][subaccount] = {"api_key": "", "api_secret": ""}
         with open(API_KEYS_PATH, 'w') as f:
             json.dump(self.api_data, f, indent=2)
         self.render_exchange_sections()
-        # Set the new subaccount editable by default
-        # Re-render will catch it and allow edit mode immediately
 
     def load_config(self):
         if os.path.exists(CONFIG_PATH):
