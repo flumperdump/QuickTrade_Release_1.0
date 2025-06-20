@@ -109,13 +109,12 @@ class SettingsTab(QWidget):
 
         for ex in self.selected_exchanges:
             exchange_box = CollapsibleBox(ex)
+            exchange_box.setContentsMargins(0, 0, 0, 0)
 
             subaccounts = self.api_data.get(ex, {})
             for subaccount, creds in subaccounts.items():
                 sub_box = QGroupBox()
                 sub_box.setLayout(QFormLayout())
-
-                is_new = creds.get("api_key", "") == "" and creds.get("api_secret", "") == ""
 
                 sub_name_input = QLineEdit(subaccount)
                 api_key_input = QLineEdit(creds.get("api_key", ""))
@@ -126,22 +125,17 @@ class SettingsTab(QWidget):
                 edit_btn = QPushButton("Edit")
                 delete_btn = QPushButton("Delete")
 
-                def make_save_func(ex=ex, sub=subaccount, name_input=sub_name_input, k=api_key_input, s=api_secret_input):
+                def make_save_func(ex=ex, old_sub=subaccount, name_input=sub_name_input, k=api_key_input, s=api_secret_input):
                     def save():
-                        new_name = name_input.text().strip()
+                        new_sub = name_input.text().strip()
                         key = k.text().strip()
                         secret = s.text().strip()
-
-                        if not new_name or not key or not secret:
+                        if not new_sub or not key or not secret:
                             return
 
-                        if new_name != sub:
-                            self.api_data[ex].pop(sub, None)
-                            subaccount_key = new_name
-                        else:
-                            subaccount_key = sub
-
-                        self.api_data[ex][subaccount_key] = {"api_key": key, "api_secret": secret}
+                        if new_sub != old_sub:
+                            self.api_data[ex].pop(old_sub, None)
+                        self.api_data[ex][new_sub] = {"api_key": key, "api_secret": secret}
                         with open(API_KEYS_PATH, 'w') as f:
                             json.dump(self.api_data, f, indent=2)
 
@@ -163,18 +157,20 @@ class SettingsTab(QWidget):
 
                 def make_delete_func(ex=ex, sub=subaccount):
                     def delete():
-                        result = QMessageBox.question(self, "Delete Subaccount?", f"Are you sure you want to delete {sub}?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-                        if result == QMessageBox.StandardButton.Yes:
+                        confirm = QMessageBox.question(
+                            self, "Delete Subaccount?",
+                            f"Are you sure you want to delete {sub}?",
+                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                        )
+                        if confirm == QMessageBox.StandardButton.Yes:
                             if ex in self.api_data and sub in self.api_data[ex]:
-                                self.api_data[ex].pop(sub)
+                                del self.api_data[ex][sub]
                                 with open(API_KEYS_PATH, 'w') as f:
                                     json.dump(self.api_data, f, indent=2)
                                 self.render_exchange_sections()
                     return delete
 
-                save_btn.clicked.connect(make_save_func())
-                delete_btn.clicked.connect(make_delete_func())
-
+                is_new = creds["api_key"] == "" and creds["api_secret"] == ""
                 if is_new:
                     edit_btn.setVisible(False)
                 else:
@@ -184,19 +180,25 @@ class SettingsTab(QWidget):
                     save_btn.setDisabled(True)
                     edit_btn.clicked.connect(make_edit_func())
 
+                save_btn.clicked.connect(make_save_func())
+                delete_btn.clicked.connect(make_delete_func())
+
+                row = QHBoxLayout()
+                row.addWidget(save_btn)
+                row.addWidget(edit_btn)
+                row.addWidget(delete_btn)
+
                 sub_box.layout().addRow("Subaccount Name:", sub_name_input)
                 sub_box.layout().addRow("API Key:", api_key_input)
                 sub_box.layout().addRow("API Secret:", api_secret_input)
-                h = QHBoxLayout()
-                h.addWidget(save_btn)
-                h.addWidget(edit_btn)
-                h.addWidget(delete_btn)
-                sub_box.layout().addRow(h)
+                sub_box.layout().addRow(row)
+
                 exchange_box.add_widget(sub_box)
 
             add_sub_btn = QPushButton(f"Add Subaccount to {ex}")
             add_sub_btn.clicked.connect(lambda _, e=ex: self.add_subaccount(e))
             exchange_box.add_widget(add_sub_btn)
+
             self.api_layout.addWidget(exchange_box)
 
     def choose_exchanges(self):
