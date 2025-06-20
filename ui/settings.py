@@ -118,26 +118,21 @@ class SettingsTab(QWidget):
                 is_new = creds.get("api_key", "") == "" and creds.get("api_secret", "") == ""
 
                 sub_name_input = QLineEdit(subaccount)
-                sub_name_input.setDisabled(not is_new)
-
                 api_key_input = QLineEdit(creds.get("api_key", ""))
-                api_key_input.setDisabled(not is_new)
                 api_secret_input = QLineEdit(creds.get("api_secret", ""))
                 api_secret_input.setEchoMode(QLineEdit.EchoMode.Password)
-                api_secret_input.setDisabled(not is_new)
 
                 save_btn = QPushButton("Save")
                 edit_btn = QPushButton("Edit")
                 delete_btn = QPushButton("Delete")
 
-                def make_save_func(ex=ex, sub=subaccount, name_input=sub_name_input, k=api_key_input, s=api_secret_input, e_btn=edit_btn):
+                def make_save_func(ex=ex, sub=subaccount, name_input=sub_name_input, k=api_key_input, s=api_secret_input):
                     def save():
                         new_name = name_input.text().strip()
                         key = k.text().strip()
                         secret = s.text().strip()
 
                         if not new_name or not key or not secret:
-                            QMessageBox.warning(self, "Missing Info", "All fields must be filled.")
                             return
 
                         if new_name != sub:
@@ -153,10 +148,8 @@ class SettingsTab(QWidget):
                         name_input.setDisabled(True)
                         k.setDisabled(True)
                         s.setDisabled(True)
-                        e_btn.setDisabled(False)
                         save_btn.setDisabled(True)
-
-                        QMessageBox.information(self, "Saved", f"Keys for {ex} → {subaccount_key} saved.")
+                        edit_btn.setVisible(True)
                     return save
 
                 def make_edit_func():
@@ -165,26 +158,31 @@ class SettingsTab(QWidget):
                         api_key_input.setDisabled(False)
                         api_secret_input.setDisabled(False)
                         save_btn.setDisabled(False)
-                        edit_btn.setDisabled(True)
+                        edit_btn.setVisible(False)
                     return edit
 
                 def make_delete_func(ex=ex, sub=subaccount):
                     def delete():
-                        if ex in self.api_data and sub in self.api_data[ex]:
-                            self.api_data[ex].pop(sub)
-                            with open(API_KEYS_PATH, 'w') as f:
-                                json.dump(self.api_data, f, indent=2)
-                            self.render_exchange_sections()
+                        result = QMessageBox.question(self, "Delete Subaccount?", f"Are you sure you want to delete {sub}?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                        if result == QMessageBox.StandardButton.Yes:
+                            if ex in self.api_data and sub in self.api_data[ex]:
+                                self.api_data[ex].pop(sub)
+                                with open(API_KEYS_PATH, 'w') as f:
+                                    json.dump(self.api_data, f, indent=2)
+                                self.render_exchange_sections()
                     return delete
 
                 save_btn.clicked.connect(make_save_func())
                 delete_btn.clicked.connect(make_delete_func())
 
-                if not is_new:
-                    edit_btn.clicked.connect(make_edit_func())
-                    save_btn.setDisabled(True)
-                else:
+                if is_new:
                     edit_btn.setVisible(False)
+                else:
+                    sub_name_input.setDisabled(True)
+                    api_key_input.setDisabled(True)
+                    api_secret_input.setDisabled(True)
+                    save_btn.setDisabled(True)
+                    edit_btn.clicked.connect(make_edit_func())
 
                 sub_box.layout().addRow("Subaccount Name:", sub_name_input)
                 sub_box.layout().addRow("API Key:", api_key_input)
