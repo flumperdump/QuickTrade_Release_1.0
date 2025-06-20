@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QMessageBox,
     QScrollArea, QHBoxLayout, QFormLayout, QListWidget, QListWidgetItem, QDialog,
-    QDialogButtonBox, QGroupBox, QToolButton, QSizePolicy, QFrame
+    QDialogButtonBox, QGroupBox, QToolButton
 )
 from PyQt6.QtCore import Qt
 import json
@@ -105,7 +105,7 @@ class SettingsTab(QWidget):
         for i in reversed(range(self.api_layout.count())):
             widget = self.api_layout.itemAt(i).widget()
             if widget:
-                widget.deleteLater()
+                widget.setParent(None)
 
         for ex in self.selected_exchanges:
             exchange_box = CollapsibleBox(ex)
