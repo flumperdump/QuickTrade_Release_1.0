@@ -54,7 +54,8 @@ class CollapsibleBox(QWidget):
         self.toggle_button.setCheckable(True)
         self.toggle_button.setChecked(True)
         self.toggle_button.setArrowType(Qt.ArrowType.DownArrow)
-        self.toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.toggle_button.setToolButtonStyle(QToolButton.ToolButtonTextBesideIcon)
+        self.toggle_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.toggle_button.clicked.connect(self.toggle)
 
         self.content_area = QFrame()
@@ -63,6 +64,7 @@ class CollapsibleBox(QWidget):
         self.content_area.setMaximumHeight(0)
 
         self.content_layout = QVBoxLayout()
+        self.content_layout.setContentsMargins(10, 0, 0, 0)
         self.content_area.setLayout(self.content_layout)
 
         self.toggle_animation = QPropertyAnimation(self.content_area, b"maximumHeight")
@@ -72,6 +74,7 @@ class CollapsibleBox(QWidget):
         layout.addWidget(self.toggle_button)
         layout.addWidget(self.content_area)
         layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
 
         self.expanded_height = 0
         self.is_expanded = False
@@ -136,6 +139,7 @@ class SettingsTab(QWidget):
 
         for ex in self.selected_exchanges:
             exchange_box = CollapsibleBox(ex)
+            exchange_box.toggle_button.setEnabled(not self.active_add)
             subaccounts = self.api_data.get(ex, {})
 
             for subaccount, creds in subaccounts.items():
