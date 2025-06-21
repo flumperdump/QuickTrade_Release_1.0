@@ -157,6 +157,7 @@ class SettingsTab(QWidget):
                         edit_btn.setVisible(True)
                         self.active_add = False
                         self.set_controls_enabled(True)
+                        self.render_exchange_sections()
                     return save
 
                 def make_edit_func():
