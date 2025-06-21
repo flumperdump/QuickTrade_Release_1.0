@@ -48,20 +48,19 @@ class ExchangeSelectionDialog(QDialog):
 class CollapsibleBox(QWidget):
     def __init__(self, title):
         super().__init__()
-        self.toggle_button = QToolButton()
+        self.toggle_button = QToolButton(self)
         self.toggle_button.setStyleSheet("text-align: left; font-weight: bold;")
         self.toggle_button.setText(title)
         self.toggle_button.setCheckable(True)
         self.toggle_button.setChecked(True)
         self.toggle_button.setArrowType(Qt.ArrowType.DownArrow)
-        self.toggle_button.setToolButtonStyle(QToolButton.ToolButtonTextBesideIcon)
+        self.toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.toggle_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.toggle_button.clicked.connect(self.toggle)
 
         self.content_area = QFrame()
         self.content_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.content_area.setFrameShape(QFrame.Shape.NoFrame)
-        self.content_area.setMaximumHeight(0)
 
         self.content_layout = QVBoxLayout()
         self.content_layout.setContentsMargins(10, 0, 0, 0)
@@ -77,7 +76,7 @@ class CollapsibleBox(QWidget):
         self.setLayout(layout)
 
         self.expanded_height = 0
-        self.is_expanded = False
+        self.is_expanded = True
 
     def add_widget(self, widget):
         self.content_layout.addWidget(widget)
