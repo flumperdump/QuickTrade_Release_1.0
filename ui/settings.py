@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QMessageBox,
     QScrollArea, QHBoxLayout, QFormLayout, QListWidget, QListWidgetItem, QDialog,
-    QDialogButtonBox, QGroupBox, QToolButton, QSizePolicy, QFrame
+    QDialogButtonBox, QGroupBox, QToolButton, QSizePolicy, QFrame, QSpacerItem
 )
 from PyQt6.QtCore import Qt, QPropertyAnimation
 import json
@@ -49,7 +49,7 @@ class CollapsibleBox(QWidget):
     def __init__(self, title):
         super().__init__()
         self.toggle_button = QToolButton()
-        self.toggle_button.setStyleSheet("text-align: left")
+        self.toggle_button.setStyleSheet("text-align: left; font-weight: bold;")
         self.toggle_button.setText(title)
         self.toggle_button.setCheckable(True)
         self.toggle_button.setChecked(True)
@@ -78,7 +78,7 @@ class CollapsibleBox(QWidget):
 
     def add_widget(self, widget):
         self.content_layout.addWidget(widget)
-        self.expanded_height += widget.sizeHint().height()
+        self.expanded_height += widget.sizeHint().height() + 10
         if self.toggle_button.isChecked():
             self.content_area.setMaximumHeight(self.expanded_height)
 
@@ -151,6 +151,10 @@ class SettingsTab(QWidget):
                 edit_btn = QPushButton("Edit")
                 delete_btn = QPushButton("Delete")
 
+                save_btn.setMinimumWidth(60)
+                edit_btn.setMinimumWidth(60)
+                delete_btn.setMinimumWidth(60)
+
                 def make_save_func(ex=ex, old_sub=subaccount, name_input=sub_name_input, k=api_key_input, s=api_secret_input):
                     def save():
                         new_sub = name_input.text().strip()
@@ -220,6 +224,7 @@ class SettingsTab(QWidget):
                 row.addWidget(save_btn)
                 row.addWidget(edit_btn)
                 row.addWidget(delete_btn)
+                row.addStretch()
 
                 sub_box.layout().addRow("Subaccount Name:", sub_name_input)
                 sub_box.layout().addRow("API Key:", api_key_input)
@@ -229,6 +234,8 @@ class SettingsTab(QWidget):
                 exchange_box.add_widget(sub_box)
 
             add_sub_btn = QPushButton(f"Add Subaccount to {ex}")
+            add_sub_btn.setMinimumHeight(28)
+            add_sub_btn.setMinimumWidth(180)
             add_sub_btn.clicked.connect(lambda _, e=ex: self.add_subaccount(e))
             add_sub_btn.setEnabled(not self.active_add)
             exchange_box.add_widget(add_sub_btn)
