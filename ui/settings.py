@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (
     QScrollArea, QHBoxLayout, QFormLayout, QListWidget, QListWidgetItem, QDialog,
     QDialogButtonBox, QGroupBox, QToolButton, QSizePolicy, QFrame, QSpacerItem
 )
-from PyQt6.QtCore import Qt, QPropertyAnimation
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
 import json
 import os
 
@@ -48,19 +48,18 @@ class ExchangeSelectionDialog(QDialog):
 class CollapsibleBox(QWidget):
     def __init__(self, title):
         super().__init__()
-        self.toggle_button = QToolButton(self)
+        self.toggle_button = QToolButton()
         self.toggle_button.setStyleSheet("text-align: left; font-weight: bold;")
         self.toggle_button.setText(title)
         self.toggle_button.setCheckable(True)
         self.toggle_button.setChecked(True)
         self.toggle_button.setArrowType(Qt.ArrowType.DownArrow)
-        self.toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.toggle_button.setToolButtonStyle(QToolButton.ToolButtonTextBesideIcon)
         self.toggle_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.toggle_button.clicked.connect(self.toggle)
 
-        self.content_area = QFrame()
+        self.content_area = QWidget()
         self.content_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.content_area.setFrameShape(QFrame.Shape.NoFrame)
 
         self.content_layout = QVBoxLayout()
         self.content_layout.setContentsMargins(10, 0, 0, 0)
@@ -68,29 +67,45 @@ class CollapsibleBox(QWidget):
 
         self.toggle_animation = QPropertyAnimation(self.content_area, b"maximumHeight")
         self.toggle_animation.setDuration(150)
+        self.toggle_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
 
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.toggle_button)
-        layout.addWidget(self.content_area)
-        layout.setContentsMargins(0, 0, 0, 0)
-        self.setLayout(layout)
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.addWidget(self.toggle_button)
+        self.main_layout.addWidget(self.content_area)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.setSpacing(0)
+        self.setLayout(self.main_layout)
 
         self.expanded_height = 0
         self.is_expanded = True
+        self.locked = False
 
     def add_widget(self, widget):
         self.content_layout.addWidget(widget)
         self.expanded_height += widget.sizeHint().height() + 10
-        if self.toggle_button.isChecked():
+        if self.is_expanded:
             self.content_area.setMaximumHeight(self.expanded_height)
 
     def toggle(self):
+        if self.locked:
+            return
         self.is_expanded = not self.is_expanded
         self.toggle_button.setArrowType(Qt.ArrowType.DownArrow if self.is_expanded else Qt.ArrowType.RightArrow)
         new_height = self.expanded_height if self.is_expanded else 0
         self.toggle_animation.stop()
+        self.toggle_animation.setStartValue(self.content_area.maximumHeight())
         self.toggle_animation.setEndValue(new_height)
         self.toggle_animation.start()
+
+    def lock_toggle(self):
+        self.locked = True
+        self.toggle_button.setEnabled(False)
+        self.toggle_button.setStyleSheet("text-align: left; font-weight: bold; color: gray;")
+
+    def unlock_toggle(self):
+        self.locked = False
+        self.toggle_button.setEnabled(True)
+        self.toggle_button.setStyleSheet("text-align: left; font-weight: bold;")
 
 class SettingsTab(QWidget):
     def __init__(self, on_exchanges_updated=None):
