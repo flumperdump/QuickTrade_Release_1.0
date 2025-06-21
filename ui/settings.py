@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QMessageBox,
     QScrollArea, QHBoxLayout, QFormLayout, QListWidget, QListWidgetItem, QDialog,
-    QDialogButtonBox, QGroupBox, QToolButton
+    QDialogButtonBox, QGroupBox, QToolButton, QSizePolicy
 )
 from PyQt6.QtCore import Qt
 import json
@@ -45,30 +45,35 @@ class ExchangeSelectionDialog(QDialog):
     def get_selected(self):
         return [self.exchange_list.item(i).text() for i in range(self.exchange_list.count()) if self.exchange_list.item(i).isSelected()]
 
-class CollapsibleBox(QGroupBox):
+class CollapsibleBox(QWidget):
     def __init__(self, title):
         super().__init__()
-        self.setTitle("")
-        self.toggle_button = QToolButton(text=title, checkable=True, checked=True)
-        self.toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.toggle_button = QToolButton()
+        self.toggle_button.setStyleSheet("text-align: left")
+        self.toggle_button.setText(title)
+        self.toggle_button.setCheckable(True)
+        self.toggle_button.setChecked(True)
         self.toggle_button.setArrowType(Qt.ArrowType.DownArrow)
-        self.toggle_button.clicked.connect(self.toggle_content)
+        self.toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.toggle_button.clicked.connect(self.toggle)
 
-        self.content = QWidget()
-        self.content.setLayout(QVBoxLayout())
+        self.content_area = QWidget()
+        self.content_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.content_layout = QVBoxLayout()
+        self.content_area.setLayout(self.content_layout)
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.toggle_button)
-        layout.addWidget(self.content)
+        layout.addWidget(self.content_area)
         layout.setContentsMargins(0, 0, 0, 0)
 
-    def toggle_content(self):
-        visible = not self.content.isVisible()
-        self.content.setVisible(visible)
-        self.toggle_button.setArrowType(Qt.ArrowType.DownArrow if visible else Qt.ArrowType.RightArrow)
-
     def add_widget(self, widget):
-        self.content.layout().addWidget(widget)
+        self.content_layout.addWidget(widget)
+
+    def toggle(self):
+        visible = self.content_area.isVisible()
+        self.content_area.setVisible(not visible)
+        self.toggle_button.setArrowType(Qt.ArrowType.DownArrow if not visible else Qt.ArrowType.RightArrow)
 
 class SettingsTab(QWidget):
     def __init__(self, on_exchanges_updated=None):
@@ -109,9 +114,8 @@ class SettingsTab(QWidget):
 
         for ex in self.selected_exchanges:
             exchange_box = CollapsibleBox(ex)
-            exchange_box.setContentsMargins(0, 0, 0, 0)
-
             subaccounts = self.api_data.get(ex, {})
+
             for subaccount, creds in subaccounts.items():
                 sub_box = QGroupBox()
                 sub_box.setLayout(QFormLayout())
