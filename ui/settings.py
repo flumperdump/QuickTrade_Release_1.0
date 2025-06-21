@@ -1,7 +1,8 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QMessageBox,
     QScrollArea, QHBoxLayout, QFormLayout, QListWidget, QListWidgetItem, QDialog,
-    QDialogButtonBox, QGroupBox, QToolButton, QSizePolicy, QFrame, QSpacerItem
+    QDialogButtonBox, QGroupBox, QToolButton, QSizePolicy, QFrame, QSpacerItem,
+    QCheckBox
 )
 from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
 import json
@@ -23,16 +24,14 @@ class ExchangeSelectionDialog(QDialog):
         self.selected_exchanges = selected_exchanges
 
         layout = QVBoxLayout()
-        self.exchange_list = QListWidget()
-        self.exchange_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
-
-        for ex in SUPPORTED_EXCHANGES:
-            item = QListWidgetItem(ex)
-            item.setSelected(ex in selected_exchanges)
-            self.exchange_list.addItem(item)
+        self.checkboxes = []
 
         layout.addWidget(QLabel("Select exchanges to enable:"))
-        layout.addWidget(self.exchange_list)
+        for ex in SUPPORTED_EXCHANGES:
+            checkbox = QCheckBox(ex)
+            checkbox.setChecked(ex in selected_exchanges)
+            self.checkboxes.append(checkbox)
+            layout.addWidget(checkbox)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
@@ -43,7 +42,7 @@ class ExchangeSelectionDialog(QDialog):
         self.setLayout(layout)
 
     def get_selected(self):
-        return [self.exchange_list.item(i).text() for i in range(self.exchange_list.count()) if self.exchange_list.item(i).isSelected()]
+        return [cb.text() for cb in self.checkboxes if cb.isChecked()]
 
 class CollapsibleBox(QWidget):
     def __init__(self, title):
@@ -54,7 +53,7 @@ class CollapsibleBox(QWidget):
         self.toggle_button.setCheckable(True)
         self.toggle_button.setChecked(True)
         self.toggle_button.setArrowType(Qt.ArrowType.DownArrow)
-        self.toggle_button.setToolButtonStyle(QToolButton.ToolButtonTextBesideIcon)
+        self.toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.toggle_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.toggle_button.clicked.connect(self.toggle)
 
