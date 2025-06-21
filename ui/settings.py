@@ -1,9 +1,9 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QMessageBox,
     QScrollArea, QHBoxLayout, QFormLayout, QListWidget, QListWidgetItem, QDialog,
-    QDialogButtonBox, QGroupBox, QToolButton, QSizePolicy
+    QDialogButtonBox, QGroupBox, QToolButton, QSizePolicy, QFrame
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QPropertyAnimation
 import json
 import os
 
@@ -57,23 +57,38 @@ class CollapsibleBox(QWidget):
         self.toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.toggle_button.clicked.connect(self.toggle)
 
-        self.content_area = QWidget()
+        self.content_area = QFrame()
         self.content_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.content_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.content_area.setMaximumHeight(0)
+
         self.content_layout = QVBoxLayout()
         self.content_area.setLayout(self.content_layout)
+
+        self.toggle_animation = QPropertyAnimation(self.content_area, b"maximumHeight")
+        self.toggle_animation.setDuration(150)
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.toggle_button)
         layout.addWidget(self.content_area)
         layout.setContentsMargins(0, 0, 0, 0)
 
+        self.expanded_height = 0
+        self.is_expanded = False
+
     def add_widget(self, widget):
         self.content_layout.addWidget(widget)
+        self.expanded_height += widget.sizeHint().height()
+        if self.toggle_button.isChecked():
+            self.content_area.setMaximumHeight(self.expanded_height)
 
     def toggle(self):
-        visible = self.content_area.isVisible()
-        self.content_area.setVisible(not visible)
-        self.toggle_button.setArrowType(Qt.ArrowType.DownArrow if not visible else Qt.ArrowType.RightArrow)
+        self.is_expanded = not self.is_expanded
+        self.toggle_button.setArrowType(Qt.ArrowType.DownArrow if self.is_expanded else Qt.ArrowType.RightArrow)
+        new_height = self.expanded_height if self.is_expanded else 0
+        self.toggle_animation.stop()
+        self.toggle_animation.setEndValue(new_height)
+        self.toggle_animation.start()
 
 class SettingsTab(QWidget):
     def __init__(self, on_exchanges_updated=None):
@@ -96,7 +111,6 @@ class SettingsTab(QWidget):
 
         self.api_box = QGroupBox("Manage API Keys")
         self.api_layout = QVBoxLayout()
-
         self.api_box.setLayout(self.api_layout)
         self.container.layout().addWidget(self.api_box)
 
@@ -155,6 +169,7 @@ class SettingsTab(QWidget):
                         s.setDisabled(True)
                         save_btn.setDisabled(True)
                         edit_btn.setVisible(True)
+
                         self.active_add = False
                         self.set_controls_enabled(True)
                         self.render_exchange_sections()
