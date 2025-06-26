@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QMessageBox,
     QScrollArea, QHBoxLayout, QFormLayout, QListWidget, QListWidgetItem, QDialog,
-    QDialogButtonBox, QGroupBox, QToolButton, QSizePolicy, QFrame,
+    QDialogButtonBox, QGroupBox, QToolButton, QSizePolicy, QFrame, QSpacerItem,
     QCheckBox
 )
 from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
@@ -171,36 +171,21 @@ class SettingsTab(QWidget):
                 edit_btn = QPushButton("Edit")
                 delete_btn = QPushButton("Delete")
 
-                is_new = creds["api_key"] == "" and creds["api_secret"] == ""
+                sub_name_input.setDisabled(True)
+                api_key_input.setDisabled(True)
+                api_secret_input.setDisabled(True)
+                save_btn.setDisabled(True)
 
-                if is_new:
-                    sub_name_input.setDisabled(False)
-                    api_key_input.setDisabled(False)
-                    api_secret_input.setDisabled(False)
-                    save_btn.setDisabled(False)
-                    edit_btn.setVisible(False)
-                    self.active_add = True
-                    self.currently_editing = (ex, subaccount)
-                    self.set_controls_enabled(False)
-                else:
-                    sub_name_input.setDisabled(True)
-                    api_key_input.setDisabled(True)
-                    api_secret_input.setDisabled(True)
-                    save_btn.setDisabled(True)
-
-                def make_save(exchange, old_sub, name_input, key_input, secret_input):
+                def make_save(ex=ex, old_sub=subaccount, name_input=sub_name_input, k=api_key_input, s=api_secret_input):
                     def save():
                         new_sub = name_input.text().strip()
-                        key = key_input.text().strip()
-                        secret = secret_input.text().strip()
+                        key = k.text().strip()
+                        secret = s.text().strip()
                         if not new_sub or not key or not secret:
                             return
                         if new_sub != old_sub:
-                            self.api_data[exchange].pop(old_sub, None)
-                        self.api_data[exchange][new_sub] = {
-                            "api_key": key,
-                            "api_secret": secret
-                        }
+                            self.api_data[ex].pop(old_sub, None)
+                        self.api_data[ex][new_sub] = {"api_key": key, "api_secret": secret}
                         with open(API_KEYS_PATH, 'w') as f:
                             json.dump(self.api_data, f, indent=2)
                         self.active_add = False
@@ -209,23 +194,23 @@ class SettingsTab(QWidget):
                         self.render_exchange_sections()
                     return save
 
-                def make_edit(exchange, sub):
+                def make_edit(name_input=sub_name_input, k=api_key_input, s=api_secret_input, save_button=save_btn):
                     def edit():
+                        name_input.setDisabled(False)
+                        k.setDisabled(False)
+                        s.setDisabled(False)
+                        save_button.setDisabled(False)
+                        edit_btn.setVisible(False)
                         self.active_add = True
-                        self.currently_editing = (exchange, sub)
                         self.set_controls_enabled(False)
-                        self.render_exchange_sections()
                     return edit
 
-                def make_delete(exchange, sub):
+                def make_delete(ex=ex, sub=subaccount):
                     def delete():
-                        confirm = QMessageBox.question(
-                            self, "Delete Subaccount?",
-                            f"Are you sure you want to delete {sub} from {exchange}?",
-                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                        )
+                        confirm = QMessageBox.question(self, "Delete Subaccount?", f"Delete {sub} from {ex}?",
+                                                       QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
                         if confirm == QMessageBox.StandardButton.Yes:
-                            del self.api_data[exchange][sub]
+                            del self.api_data[ex][sub]
                             with open(API_KEYS_PATH, 'w') as f:
                                 json.dump(self.api_data, f, indent=2)
                             self.active_add = False
@@ -234,13 +219,9 @@ class SettingsTab(QWidget):
                             self.render_exchange_sections()
                     return delete
 
-                save_btn.clicked.connect(make_save(ex, subaccount, sub_name_input, api_key_input, api_secret_input))
-                edit_btn.clicked.connect(make_edit(ex, subaccount))
-                delete_btn.clicked.connect(make_delete(ex, subaccount))
-
-                if self.currently_editing and (ex, subaccount) != self.currently_editing:
-                    edit_btn.setDisabled(True)
-                    delete_btn.setDisabled(True)
+                save_btn.clicked.connect(make_save())
+                edit_btn.clicked.connect(make_edit())
+                delete_btn.clicked.connect(make_delete())
 
                 row = QHBoxLayout()
                 row.addWidget(save_btn)
