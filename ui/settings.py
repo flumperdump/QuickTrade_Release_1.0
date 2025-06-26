@@ -53,6 +53,7 @@ class CollapsibleBox(QWidget):
         self.toggle_button.setCheckable(True)
         self.toggle_button.setChecked(True)
         self.toggle_button.setArrowType(Qt.ArrowType.DownArrow)
+        self.toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.toggle_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.toggle_button.clicked.connect(self.toggle)
 
@@ -110,7 +111,7 @@ class SettingsTab(QWidget):
         super().__init__()
         self.on_exchanges_updated = on_exchanges_updated
         self.active_add = False
-        self.editing_key = None
+        self.currently_editing = None
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -142,7 +143,10 @@ class SettingsTab(QWidget):
         for i in range(self.api_layout.count()):
             widget = self.api_layout.itemAt(i).widget()
             if isinstance(widget, CollapsibleBox):
-                widget.lock_toggle() if not enabled else widget.unlock_toggle()
+                if enabled:
+                    widget.unlock_toggle()
+                else:
+                    widget.lock_toggle()
 
     def render_exchange_sections(self):
         for i in reversed(range(self.api_layout.count())):
@@ -154,7 +158,7 @@ class SettingsTab(QWidget):
             exchange_box = CollapsibleBox(ex)
             subaccounts = self.api_data.get(ex, {})
 
-            for sub_idx, (subaccount, creds) in enumerate(subaccounts.items()):
+            for subaccount, creds in subaccounts.items():
                 sub_box = QGroupBox()
                 sub_box.setLayout(QFormLayout())
 
@@ -167,62 +171,72 @@ class SettingsTab(QWidget):
                 edit_btn = QPushButton("Edit")
                 delete_btn = QPushButton("Delete")
 
-                key = f"{ex}:{subaccount}:{sub_idx}"
-                is_editing = self.editing_key == key
+                is_new = creds.get("api_key") == "" and creds.get("api_secret") == ""
 
-                def save():
-                    new_sub = sub_name_input.text().strip()
-                    new_key = api_key_input.text().strip()
-                    new_secret = api_secret_input.text().strip()
-                    if not new_sub or not new_key or not new_secret:
-                        return
-                    if new_sub != subaccount:
-                        del self.api_data[ex][subaccount]
-                    self.api_data[ex][new_sub] = {"api_key": new_key, "api_secret": new_secret}
-                    with open(API_KEYS_PATH, 'w') as f:
-                        json.dump(self.api_data, f, indent=2)
-                    self.editing_key = None
-                    self.active_add = False
-                    self.set_controls_enabled(True)
-                    self.render_exchange_sections()
-
-                def edit():
-                    self.editing_key = key
-                    self.active_add = True
-                    self.set_controls_enabled(False)
-                    self.render_exchange_sections()
-
-                def delete():
-                    confirm = QMessageBox.question(self, "Delete Subaccount?", f"Delete {subaccount} from {ex}?",
-                                                   QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-                    if confirm == QMessageBox.StandardButton.Yes:
-                        del self.api_data[ex][subaccount]
-                        with open(API_KEYS_PATH, 'w') as f:
-                            json.dump(self.api_data, f, indent=2)
-                        self.editing_key = None
-                        self.active_add = False
-                        self.set_controls_enabled(True)
-                        self.render_exchange_sections()
-
-                if is_editing:
+                if is_new or self.currently_editing == (ex, subaccount):
                     sub_name_input.setDisabled(False)
                     api_key_input.setDisabled(False)
                     api_secret_input.setDisabled(False)
                     save_btn.setDisabled(False)
                     edit_btn.setVisible(False)
+                    self.active_add = True
+                    self.currently_editing = (ex, subaccount)
+                    self.set_controls_enabled(False)
                 else:
                     sub_name_input.setDisabled(True)
                     api_key_input.setDisabled(True)
                     api_secret_input.setDisabled(True)
                     save_btn.setDisabled(True)
-                    edit_btn.setVisible(True)
-                    if self.editing_key:
-                        edit_btn.setDisabled(True)
-                        delete_btn.setDisabled(True)
 
-                save_btn.clicked.connect(save)
-                edit_btn.clicked.connect(edit)
-                delete_btn.clicked.connect(delete)
+                def make_save(ex=ex, sub=subaccount):
+                    def save():
+                        new_sub = sub_name_input.text().strip()
+                        new_key = api_key_input.text().strip()
+                        new_secret = api_secret_input.text().strip()
+                        if not new_sub or not new_key or not new_secret:
+                            return
+                        if new_sub != sub:
+                            self.api_data[ex].pop(sub, None)
+                        self.api_data[ex][new_sub] = {
+                            "api_key": new_key,
+                            "api_secret": new_secret
+                        }
+                        with open(API_KEYS_PATH, 'w') as f:
+                            json.dump(self.api_data, f, indent=2)
+                        self.active_add = False
+                        self.currently_editing = None
+                        self.set_controls_enabled(True)
+                        self.render_exchange_sections()
+                    return save
+
+                def make_edit():
+                    def edit():
+                        self.currently_editing = (ex, subaccount)
+                        self.render_exchange_sections()
+                    return edit
+
+                def make_delete():
+                    def delete():
+                        confirm = QMessageBox.question(self, "Delete Subaccount?", f"Delete {subaccount} from {ex}?",
+                                                       QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                        if confirm == QMessageBox.StandardButton.Yes:
+                            if ex in self.api_data and subaccount in self.api_data[ex]:
+                                del self.api_data[ex][subaccount]
+                                with open(API_KEYS_PATH, 'w') as f:
+                                    json.dump(self.api_data, f, indent=2)
+                                self.active_add = False
+                                self.currently_editing = None
+                                self.set_controls_enabled(True)
+                                self.render_exchange_sections()
+                    return delete
+
+                save_btn.clicked.connect(make_save())
+                edit_btn.clicked.connect(make_edit())
+                delete_btn.clicked.connect(make_delete())
+
+                if self.currently_editing and (ex, subaccount) != self.currently_editing:
+                    edit_btn.setDisabled(True)
+                    delete_btn.setDisabled(True)
 
                 row = QHBoxLayout()
                 row.addWidget(save_btn)
@@ -245,16 +259,14 @@ class SettingsTab(QWidget):
     def add_subaccount(self, exchange):
         if self.active_add:
             return
-        existing = list(self.api_data.get(exchange, {}).keys())
-        next_idx = 1
-        while f"Sub{next_idx}" in existing:
-            next_idx += 1
-        subaccount = f"Sub{next_idx}"
-        self.api_data.setdefault(exchange, {})[subaccount] = {"api_key": "", "api_secret": ""}
+        subaccount = f"Sub{len(self.api_data.get(exchange, {})) + 1}"
+        if exchange not in self.api_data:
+            self.api_data[exchange] = {}
+        self.api_data[exchange][subaccount] = {"api_key": "", "api_secret": ""}
         with open(API_KEYS_PATH, 'w') as f:
             json.dump(self.api_data, f, indent=2)
         self.active_add = True
-        self.editing_key = f"{exchange}:{subaccount}:{len(self.api_data[exchange])-1}"
+        self.currently_editing = (exchange, subaccount)
         self.set_controls_enabled(False)
         self.render_exchange_sections()
 
