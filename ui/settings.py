@@ -1,8 +1,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QMessageBox,
     QScrollArea, QHBoxLayout, QFormLayout, QListWidget, QListWidgetItem, QDialog,
-    QDialogButtonBox, QGroupBox, QToolButton, QSizePolicy, QFrame, QSpacerItem,
-    QCheckBox
+    QDialogButtonBox, QGroupBox, QToolButton, QSizePolicy, QFrame, QCheckBox
 )
 from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
 import json
@@ -48,11 +47,11 @@ class CollapsibleBox(QWidget):
     def __init__(self, title):
         super().__init__()
         self.toggle_button = QToolButton()
-        self.toggle_button.setStyleSheet("text-align: left; font-weight: bold;")
         self.toggle_button.setText(title)
         self.toggle_button.setCheckable(True)
         self.toggle_button.setChecked(True)
         self.toggle_button.setArrowType(Qt.ArrowType.DownArrow)
+        self.toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.toggle_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.toggle_button.clicked.connect(self.toggle)
 
@@ -67,12 +66,12 @@ class CollapsibleBox(QWidget):
         self.toggle_animation.setDuration(150)
         self.toggle_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
 
-        self.main_layout = QVBoxLayout(self)
-        self.main_layout.addWidget(self.toggle_button)
-        self.main_layout.addWidget(self.content_area)
-        self.main_layout.setContentsMargins(0, 0, 0, 0)
-        self.main_layout.setSpacing(0)
-        self.setLayout(self.main_layout)
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.toggle_button)
+        layout.addWidget(self.content_area)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        self.setLayout(layout)
 
         self.expanded_height = 0
         self.is_expanded = True
@@ -109,8 +108,7 @@ class SettingsTab(QWidget):
     def __init__(self, on_exchanges_updated=None):
         super().__init__()
         self.on_exchanges_updated = on_exchanges_updated
-        self.active_add = False
-        self.currently_editing = None
+        self.editing_field = None
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -171,16 +169,14 @@ class SettingsTab(QWidget):
                 delete_btn = QPushButton("Delete")
 
                 is_new = creds["api_key"] == "" and creds["api_secret"] == ""
-                is_editing = self.currently_editing == (ex, subaccount)
+                is_current_edit = self.editing_field == (ex, subaccount)
 
-                if is_new or is_editing:
+                if is_new or is_current_edit:
                     sub_name_input.setDisabled(False)
                     api_key_input.setDisabled(False)
                     api_secret_input.setDisabled(False)
                     save_btn.setDisabled(False)
                     edit_btn.setVisible(False)
-                    self.active_add = True
-                    self.currently_editing = (ex, subaccount)
                     self.set_controls_enabled(False)
                 else:
                     sub_name_input.setDisabled(True)
@@ -201,15 +197,14 @@ class SettingsTab(QWidget):
                         }
                         with open(API_KEYS_PATH, 'w') as f:
                             json.dump(self.api_data, f, indent=2)
-                        self.active_add = False
-                        self.currently_editing = None
+                        self.editing_field = None
                         self.set_controls_enabled(True)
                         self.render_exchange_sections()
                     return save
 
                 def make_edit():
                     def edit():
-                        self.currently_editing = (ex, subaccount)
+                        self.editing_field = (ex, subaccount)
                         self.render_exchange_sections()
                     return edit
 
@@ -221,8 +216,7 @@ class SettingsTab(QWidget):
                             del self.api_data[ex][subaccount]
                             with open(API_KEYS_PATH, 'w') as f:
                                 json.dump(self.api_data, f, indent=2)
-                            self.active_add = False
-                            self.currently_editing = None
+                            self.editing_field = None
                             self.set_controls_enabled(True)
                             self.render_exchange_sections()
                     return delete
@@ -231,7 +225,7 @@ class SettingsTab(QWidget):
                 edit_btn.clicked.connect(make_edit())
                 delete_btn.clicked.connect(make_delete())
 
-                if self.currently_editing and (ex, subaccount) != self.currently_editing:
+                if self.editing_field and self.editing_field != (ex, subaccount):
                     edit_btn.setDisabled(True)
                     delete_btn.setDisabled(True)
 
@@ -248,13 +242,13 @@ class SettingsTab(QWidget):
                 exchange_box.add_widget(sub_box)
 
             add_btn = QPushButton(f"Add Subaccount to {ex}")
-            add_btn.setEnabled(not self.active_add)
+            add_btn.setEnabled(self.editing_field is None)
             add_btn.clicked.connect(lambda _, e=ex: self.add_subaccount(e))
             exchange_box.add_widget(add_btn)
             self.api_layout.addWidget(exchange_box)
 
     def add_subaccount(self, exchange):
-        if self.active_add:
+        if self.editing_field is not None:
             return
         subaccount = f"Sub{len(self.api_data.get(exchange, {})) + 1}"
         if exchange not in self.api_data:
@@ -262,8 +256,7 @@ class SettingsTab(QWidget):
         self.api_data[exchange][subaccount] = {"api_key": "", "api_secret": ""}
         with open(API_KEYS_PATH, 'w') as f:
             json.dump(self.api_data, f, indent=2)
-        self.active_add = True
-        self.currently_editing = (exchange, subaccount)
+        self.editing_field = (exchange, subaccount)
         self.set_controls_enabled(False)
         self.render_exchange_sections()
 
