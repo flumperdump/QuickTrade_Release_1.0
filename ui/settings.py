@@ -211,13 +211,10 @@ class SettingsTab(QWidget):
 
                 def make_edit(exchange, sub):
                     def edit():
+                        self.active_add = True
                         self.currently_editing = (exchange, sub)
-                        sub_name_input.setDisabled(False)
-                        api_key_input.setDisabled(False)
-                        api_secret_input.setDisabled(False)
-                        save_btn.setDisabled(False)
-                        edit_btn.setVisible(False)
                         self.set_controls_enabled(False)
+                        self.render_exchange_sections()
                     return edit
 
                 def make_delete(exchange, sub):
