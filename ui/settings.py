@@ -218,19 +218,36 @@ class SettingsTab(QWidget):
                         self.set_controls_enabled(False)
                     return edit
 
-                def make_delete():
+                def make_delete(ex=ex, sub=subaccount):
                     def delete():
-                        confirm = QMessageBox.question(self, "Delete Subaccount?", f"Delete {subaccount} from {ex}?",
-                                                       QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                        confirm = QMessageBox.question(
+                            self,
+                            "Delete Subaccount?",
+                            f"Are you sure you want to delete {sub} from {ex}?",
+                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                        )
                         if confirm == QMessageBox.StandardButton.Yes:
-                            del self.api_data[ex][subaccount]
-                            with open(API_KEYS_PATH, 'w') as f:
-                                json.dump(self.api_data, f, indent=2)
-                            self.active_add = False
-                            self.currently_editing = None
+                            # Safely remove subaccount
+                            try:
+                                if ex in self.api_data and sub in self.api_data[ex]:
+                                    del self.api_data[ex][sub]
+                                    if not self.api_data[ex]:  # If no subaccounts left, optionally remove the exchange
+                                        self.api_data.pop(ex)
+                                    with open(API_KEYS_PATH, 'w') as f:
+                                        json.dump(self.api_data, f, indent=2)
+                            except Exception as e:
+                                QMessageBox.critical(self, "Error", f"Failed to delete subaccount: {e}")
+                                return
+
+                            # Reset editing state
+                            if self.currently_editing == (ex, sub):
+                                self.currently_editing = None
+                                self.active_add = False
+
                             self.set_controls_enabled(True)
                             self.render_exchange_sections()
                     return delete
+
 
                 save_btn.clicked.connect(make_save())
                 edit_btn.clicked.connect(make_edit())
