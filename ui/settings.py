@@ -1,5 +1,3 @@
-# settings.py
-
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QMessageBox,
     QScrollArea, QHBoxLayout, QFormLayout, QListWidget, QListWidgetItem, QDialog,
@@ -108,7 +106,6 @@ class CollapsibleBox(QWidget):
         self.toggle_button.setEnabled(True)
         self.toggle_button.setStyleSheet("text-align: left; font-weight: bold;")
 
-
 class SettingsTab(QWidget):
     def __init__(self, on_exchanges_updated=None):
         super().__init__()
@@ -174,42 +171,59 @@ class SettingsTab(QWidget):
                 edit_btn = QPushButton("Edit")
                 delete_btn = QPushButton("Delete")
 
-                def save_func(ex=ex, old=subaccount, name=sub_name_input, key=api_key_input, secret=api_secret_input):
+                is_new = creds["api_key"] == "" and creds["api_secret"] == ""
+
+                if is_new:
+                    sub_name_input.setDisabled(False)
+                    api_key_input.setDisabled(False)
+                    api_secret_input.setDisabled(False)
+                    save_btn.setDisabled(False)
+                    edit_btn.setVisible(False)
+                    self.active_add = True
+                    self.currently_editing = (ex, subaccount)
+                    self.set_controls_enabled(False)
+                else:
+                    sub_name_input.setDisabled(True)
+                    api_key_input.setDisabled(True)
+                    api_secret_input.setDisabled(True)
+                    save_btn.setDisabled(True)
+
+                def make_save(ex=ex, sub=subaccount):
                     def save():
-                        new_sub = name.text().strip()
-                        if not new_sub or not key.text().strip() or not secret.text().strip():
+                        new_sub = sub_name_input.text().strip()
+                        if not new_sub or not api_key_input.text().strip() or not api_secret_input.text().strip():
                             return
-                        if old != new_sub:
-                            self.api_data[ex].pop(old, None)
-                        self.api_data[ex][new_sub] = {"api_key": key.text().strip(), "api_secret": secret.text().strip()}
+                        if new_sub != sub:
+                            self.api_data[ex].pop(sub, None)
+                        self.api_data[ex][new_sub] = {
+                            "api_key": api_key_input.text().strip(),
+                            "api_secret": api_secret_input.text().strip()
+                        }
                         with open(API_KEYS_PATH, 'w') as f:
                             json.dump(self.api_data, f, indent=2)
-                        self.currently_editing = None
                         self.active_add = False
+                        self.currently_editing = None
                         self.set_controls_enabled(True)
                         self.render_exchange_sections()
                     return save
 
-                def edit_func():
+                def make_edit():
                     def edit():
                         self.currently_editing = (ex, subaccount)
-                        name.setDisabled(False)
-                        key.setDisabled(False)
-                        secret.setDisabled(False)
+                        sub_name_input.setDisabled(False)
+                        api_key_input.setDisabled(False)
+                        api_secret_input.setDisabled(False)
                         save_btn.setDisabled(False)
                         edit_btn.setVisible(False)
                         self.set_controls_enabled(False)
                     return edit
 
-                def delete_func(ex=ex, sub=subaccount):
+                def make_delete():
                     def delete():
-                        confirm = QMessageBox.question(
-                            self, "Delete Subaccount?",
-                            f"Delete {sub} from {ex}?",
-                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                        )
+                        confirm = QMessageBox.question(self, "Delete Subaccount?", f"Delete {subaccount} from {ex}?",
+                                                       QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
                         if confirm == QMessageBox.StandardButton.Yes:
-                            del self.api_data[ex][sub]
+                            del self.api_data[ex][subaccount]
                             with open(API_KEYS_PATH, 'w') as f:
                                 json.dump(self.api_data, f, indent=2)
                             self.active_add = False
@@ -218,14 +232,9 @@ class SettingsTab(QWidget):
                             self.render_exchange_sections()
                     return delete
 
-                sub_name_input.setDisabled(True)
-                api_key_input.setDisabled(True)
-                api_secret_input.setDisabled(True)
-                save_btn.setDisabled(True)
-
-                edit_btn.clicked.connect(edit_func())
-                save_btn.clicked.connect(save_func())
-                delete_btn.clicked.connect(delete_func())
+                save_btn.clicked.connect(make_save())
+                edit_btn.clicked.connect(make_edit())
+                delete_btn.clicked.connect(make_delete())
 
                 if self.currently_editing and (ex, subaccount) != self.currently_editing:
                     edit_btn.setDisabled(True)
@@ -240,6 +249,7 @@ class SettingsTab(QWidget):
                 sub_box.layout().addRow("API Key:", api_key_input)
                 sub_box.layout().addRow("API Secret:", api_secret_input)
                 sub_box.layout().addRow(row)
+
                 exchange_box.add_widget(sub_box)
 
             add_btn = QPushButton(f"Add Subaccount to {ex}")
@@ -258,6 +268,7 @@ class SettingsTab(QWidget):
         with open(API_KEYS_PATH, 'w') as f:
             json.dump(self.api_data, f, indent=2)
         self.active_add = True
+        self.currently_editing = (exchange, subaccount)
         self.set_controls_enabled(False)
         self.render_exchange_sections()
 
