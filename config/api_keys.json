@@ -1,7 +1,24 @@
 {
   "Binance": {
-    "Main": { "api_key": "xxx", "api_secret": "yyy" },
-    "Bot1": { "api_key": "aaa", "api_secret": "bbb" }
+    "Main": {
+      "api_key": "your-binance-main-api-key",
+      "api_secret": "your-binance-main-api-secret"
+    },
+    "Bot1": {
+      "api_key": "your-binance-bot1-api-key",
+      "api_secret": "your-binance-bot1-api-secret"
+    }
   },
-  ...
+  "Kraken": {
+    "Main": {
+      "api_key": "your-kraken-main-api-key",
+      "api_secret": "your-kraken-main-api-secret"
+    }
+  },
+  "KuCoin": {
+    "Trading": {
+      "api_key": "your-kucoin-trading-api-key",
+      "api_secret": "your-kucoin-trading-api-secret"
+    }
+  }
 }
