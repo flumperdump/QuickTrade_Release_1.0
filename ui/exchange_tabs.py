@@ -2,12 +2,13 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QComboBox, QLineEdit,
     QHBoxLayout, QMessageBox, QSpacerItem, QSizePolicy
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt
 import json
 import os
 
 CONFIG_PATH = "config"
 API_KEYS_FILE = os.path.join(CONFIG_PATH, "api_keys.json")
+USER_PREFS_FILE = os.path.join(CONFIG_PATH, "user_prefs.json")
 
 class ExchangeTab(QWidget):
     def __init__(self, exchange_name):
@@ -20,15 +21,13 @@ class ExchangeTab(QWidget):
         layout.setSpacing(6)
         self.setLayout(layout)
 
+        # Load user preferences
+        self.user_prefs = self.load_user_prefs()
+
         # Load subaccounts for this exchange
         self.subaccount_selector = QComboBox()
+        self.subaccount_selector.currentTextChanged.connect(self.update_pair_selection)
         self.load_subaccounts()
-
-        # Set up auto-refresh of subaccount list
-        self.last_subaccounts = []
-        self.refresh_timer = QTimer(self)
-        self.refresh_timer.timeout.connect(self.check_subaccount_updates)
-        self.refresh_timer.start(2000)  # Check every 2 seconds
 
         # Line 1: Subaccount and Trading Pair
         top_row = QHBoxLayout()
@@ -75,34 +74,46 @@ class ExchangeTab(QWidget):
         # Initial toggle state
         self.toggle_price_input("Market")
 
+        # Set defaults
+        self.set_default_selections()
+
     def toggle_price_input(self, order_type):
         self.price_input.setVisible(order_type == "Limit")
 
+    def load_user_prefs(self):
+        if os.path.exists(USER_PREFS_FILE):
+            try:
+                with open(USER_PREFS_FILE, 'r') as f:
+                    return json.load(f)
+            except:
+                return {}
+        return {}
+
+    def save_user_prefs(self):
+        with open(USER_PREFS_FILE, 'w') as f:
+            json.dump(self.user_prefs, f, indent=2)
+
     def load_subaccounts(self):
         self.subaccount_selector.clear()
-        subaccounts = []
+        last_used = self.user_prefs.get("last_used", {}).get(self.exchange, {})
+        default_sub = last_used.get("subaccount", "")
+
         if os.path.exists(API_KEYS_FILE):
             try:
                 with open(API_KEYS_FILE, 'r') as f:
                     api_data = json.load(f)
                     subaccounts = list(api_data.get(self.exchange, {}).keys())
                     self.subaccount_selector.addItems(subaccounts)
+                    if default_sub in subaccounts:
+                        self.subaccount_selector.setCurrentText(default_sub)
             except Exception as e:
                 print(f"Error loading API keys: {e}")
-        self.last_subaccounts = subaccounts
 
-    def check_subaccount_updates(self):
-        if os.path.exists(API_KEYS_FILE):
-            try:
-                with open(API_KEYS_FILE, 'r') as f:
-                    api_data = json.load(f)
-                    current_subs = list(api_data.get(self.exchange, {}).keys())
-                    if current_subs != self.last_subaccounts:
-                        self.subaccount_selector.clear()
-                        self.subaccount_selector.addItems(current_subs)
-                        self.last_subaccounts = current_subs
-            except Exception as e:
-                print(f"Error checking subaccount updates: {e}")
+    def update_pair_selection(self, subaccount):
+        last_used = self.user_prefs.get("last_used", {}).get(self.exchange, {})
+        last_pair = last_used.get("pair", "")
+        if last_pair in ["BTC/USDT", "ETH/USDT", "SOL/USDT"]:
+            self.market_selector.setCurrentText(last_pair)
 
     def place_order(self, side):
         subaccount = self.subaccount_selector.currentText()
@@ -118,6 +129,12 @@ class ExchangeTab(QWidget):
         if not amount:
             QMessageBox.warning(self, "Input Error", "Please enter an amount.")
             return
+
+        # Save last used preferences
+        self.user_prefs.setdefault("last_used", {}).setdefault(self.exchange, {})
+        self.user_prefs["last_used"][self.exchange]["subaccount"] = subaccount
+        self.user_prefs["last_used"][self.exchange]["pair"] = pair
+        self.save_user_prefs()
 
         QMessageBox.information(
             self,
