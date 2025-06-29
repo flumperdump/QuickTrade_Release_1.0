@@ -142,22 +142,20 @@ class ExchangeTab(QWidget):
             f"{side}ing {amount} of {pair} as a {order_type} order on {self.exchange} ({subaccount})."
         )
 
-        from ui.exchange_tabs import ExchangeTab  # Ensure this matches your module structure
-        from ui.settings import CONFIG_PATH, USER_PREFS_FILE  # Optional if needed
+    def set_default_selections(self):
+        self.update_pair_selection(self.subaccount_selector.currentText())
 
-        def create_exchange_tabs():
-            import os
-            import json
 
-            user_prefs_path = os.path.join(CONFIG_PATH, "user_prefs.json")
-            selected_exchanges = []
+# ✅ FIX: Provide this so main_window.py can import successfully
+def create_exchange_tabs():
+    selected_exchanges = []
 
-            if os.path.exists(user_prefs_path):
-                with open(user_prefs_path, 'r') as f:
-                    try:
-                        prefs = json.load(f)
-                        selected_exchanges = prefs.get("enabled_exchanges", [])
-                    except:
-                        selected_exchanges = []
-        
-            return [(ex, ExchangeTab(ex)) for ex in selected_exchanges]
+    if os.path.exists(USER_PREFS_FILE):
+        try:
+            with open(USER_PREFS_FILE, 'r') as f:
+                prefs = json.load(f)
+                selected_exchanges = prefs.get("enabled_exchanges", [])
+        except Exception as e:
+            print(f"Error loading user prefs: {e}")
+
+    return [(ex, ExchangeTab(ex)) for ex in selected_exchanges]
