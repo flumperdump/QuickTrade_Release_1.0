@@ -141,3 +141,23 @@ class ExchangeTab(QWidget):
             f"{side} Order",
             f"{side}ing {amount} of {pair} as a {order_type} order on {self.exchange} ({subaccount})."
         )
+
+        from ui.exchange_tabs import ExchangeTab  # Ensure this matches your module structure
+        from ui.settings import CONFIG_PATH, USER_PREFS_FILE  # Optional if needed
+
+        def create_exchange_tabs():
+            import os
+            import json
+
+            user_prefs_path = os.path.join(CONFIG_PATH, "user_prefs.json")
+            selected_exchanges = []
+
+            if os.path.exists(user_prefs_path):
+                with open(user_prefs_path, 'r') as f:
+                    try:
+                        prefs = json.load(f)
+                        selected_exchanges = prefs.get("enabled_exchanges", [])
+                    except:
+                        selected_exchanges = []
+        
+            return [(ex, ExchangeTab(ex)) for ex in selected_exchanges]
