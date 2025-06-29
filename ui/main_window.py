@@ -1,56 +1,51 @@
 from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget
 from ui.dashboard import DashboardTab
 from ui.settings import SettingsTab
-from ui.exchange_tabs import ExchangeTab
+from ui.exchange_tabs import create_exchange_tabs
 import sys
-import json
-import os
-
-CONFIG_PATH = "config/user_prefs.json"
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("QuickTrade")
-        self.resize(1024, 650)
+        self.resize(1080, 720)
+
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
 
-        self.dashboard = DashboardTab()
-        self.tabs.addTab(self.dashboard, "Dashboard")
+        # Dashboard Tab always first
+        self.dashboard_tab = DashboardTab()
+        self.tabs.addTab(self.dashboard_tab, "Dashboard")
 
+        # Exchange Tabs placeholder
         self.exchange_tabs = {}
-        self.load_enabled_exchanges()
+        self.load_exchange_tabs()
 
+        # Settings Tab always last
         self.settings = SettingsTab(on_exchanges_updated=self.refresh_exchanges)
         self.tabs.addTab(self.settings, "Settings")
 
+        # Default to Dashboard
         self.tabs.setCurrentIndex(0)
 
-    def load_enabled_exchanges(self):
-        self.enabled_exchanges = []
-        if os.path.exists(CONFIG_PATH):
-            with open(CONFIG_PATH, 'r') as f:
-                config = json.load(f)
-                self.enabled_exchanges = config.get("enabled_exchanges", [])
-
-        for name in self.enabled_exchanges:
-            if name not in self.exchange_tabs:
-                tab = ExchangeTab(name)
-                self.exchange_tabs[name] = tab
-                self.tabs.insertTab(self.tabs.count() - 1, tab, name)
+    def load_exchange_tabs(self):
+        for name, widget in create_exchange_tabs():
+            self.exchange_tabs[name] = widget
+            self.tabs.insertTab(self.tabs.count() - 1, widget, name)
 
     def refresh_exchanges(self):
-        for name, tab in self.exchange_tabs.items():
-            self.tabs.removeTab(self.tabs.indexOf(tab))
-        self.exchange_tabs.clear()
-        self.load_enabled_exchanges()
+        # Remove old exchange tabs
+        for name, widget in self.exchange_tabs.items():
+            index = self.tabs.indexOf(widget)
+            if index != -1:
+                self.tabs.removeTab(index)
+
+        # Reload new ones
+        self.exchange_tabs = {}
+        self.load_exchange_tabs()
 
 def run_app():
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
-
-if __name__ == "__main__":
-    run_app()
