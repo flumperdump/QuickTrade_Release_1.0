@@ -9,6 +9,7 @@ class ExchangeTab(QWidget):
         super().__init__()
         self.exchange = exchange_name
         self.setLayout(QVBoxLayout())
+        self.layout().addLayout(self.top_controls)
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.layout().setSpacing(6)
 
