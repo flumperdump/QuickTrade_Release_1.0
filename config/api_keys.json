@@ -1,1 +1,7 @@
-{"Binance": {"api_key": "", "api_secret": ""}}
+{
+  "Binance": {
+    "Main": { "api_key": "xxx", "api_secret": "yyy" },
+    "Bot1": { "api_key": "aaa", "api_secret": "bbb" }
+  },
+  ...
+}
