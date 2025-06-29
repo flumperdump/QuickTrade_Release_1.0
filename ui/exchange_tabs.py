@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
+
 class ExchangeTab(QWidget):
     def __init__(self, exchange_name):
         super().__init__()
@@ -75,3 +76,7 @@ class ExchangeTab(QWidget):
             f"{side} Order",
             f"{side}ing {amount} of {pair} as a {order_type} order on {self.exchange}."
         )
+
+
+def create_exchange_tabs(exchange_names):
+    return {name: ExchangeTab(name) for name in exchange_names}
