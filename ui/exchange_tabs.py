@@ -95,8 +95,17 @@ class ExchangeTab(QWidget):
 
     def load_subaccounts(self):
         self.subaccount_selector.clear()
-        last_used = self.user_prefs.get("last_used", {}).get(self.exchange, {})
-        default_sub = last_used.get("subaccount", "")
+        self.subaccount_to_last_pair = {}
+        if os.path.exists(USER_PREFS_FILE):
+            try:
+                with open(USER_PREFS_FILE, 'r') as f:
+                    prefs = json.load(f)
+                    last_used = prefs.get("last_used", {}).get(self.exchange, {})
+                    default_sub = last_used.get("subaccount", "")
+                    self.user_prefs = prefs
+            except:
+                last_used = {}
+                default_sub = ""
 
         if os.path.exists(API_KEYS_FILE):
             try:
@@ -104,16 +113,17 @@ class ExchangeTab(QWidget):
                     api_data = json.load(f)
                     subaccounts = list(api_data.get(self.exchange, {}).keys())
                     self.subaccount_selector.addItems(subaccounts)
+                    for sub in subaccounts:
+                        self.subaccount_to_last_pair[sub] = self.user_prefs.get("last_used", {}).get(self.exchange + ":" + sub, {}).get("pair", "BTC/USDT")
                     if default_sub in subaccounts:
                         self.subaccount_selector.setCurrentText(default_sub)
             except Exception as e:
                 print(f"Error loading API keys: {e}")
 
     def update_pair_selection(self, subaccount):
-        last_used = self.user_prefs.get("last_used", {}).get(self.exchange, {})
-        last_pair = last_used.get("pair", "")
-        if last_pair in ["BTC/USDT", "ETH/USDT", "SOL/USDT"]:
-            self.market_selector.setCurrentText(last_pair)
+        default_pair = self.subaccount_to_last_pair.get(subaccount, "BTC/USDT")
+        if default_pair in ["BTC/USDT", "ETH/USDT", "SOL/USDT"]:
+            self.market_selector.setCurrentText(default_pair)
 
     def place_order(self, side):
         subaccount = self.subaccount_selector.currentText()
@@ -133,7 +143,7 @@ class ExchangeTab(QWidget):
         # Save last used preferences
         self.user_prefs.setdefault("last_used", {}).setdefault(self.exchange, {})
         self.user_prefs["last_used"][self.exchange]["subaccount"] = subaccount
-        self.user_prefs["last_used"][self.exchange]["pair"] = pair
+        self.user_prefs["last_used"][self.exchange + ":" + subaccount] = {"pair": pair}
         self.save_user_prefs()
 
         QMessageBox.information(
@@ -141,21 +151,3 @@ class ExchangeTab(QWidget):
             f"{side} Order",
             f"{side}ing {amount} of {pair} as a {order_type} order on {self.exchange} ({subaccount})."
         )
-
-    def set_default_selections(self):
-        self.update_pair_selection(self.subaccount_selector.currentText())
-
-
-# ✅ FIX: Provide this so main_window.py can import successfully
-def create_exchange_tabs():
-    selected_exchanges = []
-
-    if os.path.exists(USER_PREFS_FILE):
-        try:
-            with open(USER_PREFS_FILE, 'r') as f:
-                prefs = json.load(f)
-                selected_exchanges = prefs.get("enabled_exchanges", [])
-        except Exception as e:
-            print(f"Error loading user prefs: {e}")
-
-    return [(ex, ExchangeTab(ex)) for ex in selected_exchanges]
