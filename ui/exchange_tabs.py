@@ -74,9 +74,6 @@ class ExchangeTab(QWidget):
         # Initial toggle state
         self.toggle_price_input("Market")
 
-        # Set defaults
-        self.set_default_selections()
-
     def toggle_price_input(self, order_type):
         self.price_input.setVisible(order_type == "Limit")
 
