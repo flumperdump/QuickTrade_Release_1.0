@@ -1,8 +1,12 @@
+import json
+import os
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QPushButton, QComboBox, QLineEdit,
-    QHBoxLayout, QMessageBox, QSpacerItem, QSizePolicy
+    QWidget, QVBoxLayout, QHBoxLayout, QComboBox, QLineEdit, QPushButton,
+    QMessageBox, QSpacerItem, QSizePolicy
 )
 from PyQt6.QtCore import Qt
+
+API_KEYS_PATH = "config/api_keys.json"
 
 
 class ExchangeTab(QWidget):
@@ -10,53 +14,67 @@ class ExchangeTab(QWidget):
         super().__init__()
         self.exchange = exchange_name
 
-        # Main layout
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 12, 0, 0)  # Add small top margin (12px)
-        layout.setSpacing(6)
-        self.setLayout(layout)
+        self.setLayout(QVBoxLayout())
+        self.layout().setContentsMargins(10, 12, 10, 10)
+        self.layout().setSpacing(8)
 
-        # Top controls layout
-        self.top_controls = QHBoxLayout()
-        self.top_controls.setSpacing(6)
-
+        # Row 1: Subaccount selector & Trading pair
+        row1 = QHBoxLayout()
         self.subaccount_selector = QComboBox()
-        self.subaccount_selector.addItems(["Main", "Bot1"])  # Placeholder values
-        self.top_controls.addWidget(self.subaccount_selector)
+        self.load_subaccounts()
+        row1.addWidget(self.subaccount_selector)
 
         self.market_selector = QComboBox()
         self.market_selector.addItems(["BTC/USDT", "ETH/USDT", "SOL/USDT"])
-        self.top_controls.addWidget(self.market_selector)
+        row1.addWidget(self.market_selector)
+        self.layout().addLayout(row1)
 
+        # Row 2: Order type, Price, Amount
+        row2 = QHBoxLayout()
         self.order_type_selector = QComboBox()
         self.order_type_selector.addItems(["Market", "Limit"])
         self.order_type_selector.currentTextChanged.connect(self.toggle_price_input)
-        self.top_controls.addWidget(self.order_type_selector)
+        row2.addWidget(self.order_type_selector)
 
         self.price_input = QLineEdit()
         self.price_input.setPlaceholderText("Price")
-        self.top_controls.addWidget(self.price_input)
+        row2.addWidget(self.price_input)
 
         self.amount_input = QLineEdit()
         self.amount_input.setPlaceholderText("Amount")
-        self.top_controls.addWidget(self.amount_input)
+        row2.addWidget(self.amount_input)
+        self.layout().addLayout(row2)
 
+        # Row 3: Buy & Sell buttons
+        row3 = QHBoxLayout()
         self.buy_button = QPushButton("Buy")
         self.buy_button.clicked.connect(lambda: self.place_order("Buy"))
-        self.top_controls.addWidget(self.buy_button)
+        row3.addWidget(self.buy_button)
 
         self.sell_button = QPushButton("Sell")
         self.sell_button.clicked.connect(lambda: self.place_order("Sell"))
-        self.top_controls.addWidget(self.sell_button)
+        row3.addWidget(self.sell_button)
 
-        # Add controls to layout
-        layout.addLayout(self.top_controls)
+        self.layout().addLayout(row3)
 
-        # Push layout contents to top
-        layout.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
+        # Spacer to push content up
+        self.layout().addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
-        # Initial visibility
+        # Default state
         self.toggle_price_input("Market")
+
+    def load_subaccounts(self):
+        self.subaccount_selector.clear()
+        try:
+            with open(API_KEYS_PATH, 'r') as f:
+                api_keys = json.load(f)
+            subs = api_keys.get(self.exchange, {})
+            if subs:
+                self.subaccount_selector.addItems(list(subs.keys()))
+            else:
+                self.subaccount_selector.addItem("Default")
+        except Exception as e:
+            self.subaccount_selector.addItem("Default")
 
     def toggle_price_input(self, order_type):
         self.price_input.setVisible(order_type == "Limit")
