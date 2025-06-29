@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QComboBox, QLineEdit,
     QHBoxLayout, QMessageBox, QSpacerItem, QSizePolicy
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 import json
 import os
 
@@ -23,6 +23,12 @@ class ExchangeTab(QWidget):
         # Load subaccounts for this exchange
         self.subaccount_selector = QComboBox()
         self.load_subaccounts()
+
+        # Set up auto-refresh of subaccount list
+        self.last_subaccounts = []
+        self.refresh_timer = QTimer(self)
+        self.refresh_timer.timeout.connect(self.check_subaccount_updates)
+        self.refresh_timer.start(2000)  # Check every 2 seconds
 
         # Line 1: Subaccount and Trading Pair
         top_row = QHBoxLayout()
@@ -74,14 +80,29 @@ class ExchangeTab(QWidget):
 
     def load_subaccounts(self):
         self.subaccount_selector.clear()
+        subaccounts = []
         if os.path.exists(API_KEYS_FILE):
             try:
                 with open(API_KEYS_FILE, 'r') as f:
                     api_data = json.load(f)
-                    subaccounts = api_data.get(self.exchange, {}).keys()
+                    subaccounts = list(api_data.get(self.exchange, {}).keys())
                     self.subaccount_selector.addItems(subaccounts)
             except Exception as e:
                 print(f"Error loading API keys: {e}")
+        self.last_subaccounts = subaccounts
+
+    def check_subaccount_updates(self):
+        if os.path.exists(API_KEYS_FILE):
+            try:
+                with open(API_KEYS_FILE, 'r') as f:
+                    api_data = json.load(f)
+                    current_subs = list(api_data.get(self.exchange, {}).keys())
+                    if current_subs != self.last_subaccounts:
+                        self.subaccount_selector.clear()
+                        self.subaccount_selector.addItems(current_subs)
+                        self.last_subaccounts = current_subs
+            except Exception as e:
+                print(f"Error checking subaccount updates: {e}")
 
     def place_order(self, side):
         subaccount = self.subaccount_selector.currentText()
