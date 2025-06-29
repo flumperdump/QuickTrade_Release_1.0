@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QComboBox, QLineEdit,
-    QHBoxLayout, QMessageBox
+    QHBoxLayout, QMessageBox, QSpacerItem, QSizePolicy
 )
 from PyQt6.QtCore import Qt
 
@@ -8,13 +8,16 @@ class ExchangeTab(QWidget):
     def __init__(self, exchange_name):
         super().__init__()
         self.exchange = exchange_name
-        self.setLayout(QVBoxLayout())
-        self.layout().addLayout(self.top_controls)
-        self.layout().setContentsMargins(0, 0, 0, 0)
-        self.layout().setSpacing(6)
+
+        # Main layout with no top margin
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        self.setLayout(layout)
 
         # Top controls layout
         self.top_controls = QHBoxLayout()
+        self.top_controls.setSpacing(6)
 
         self.market_selector = QComboBox()
         self.market_selector.addItems(["BTC/USDT", "ETH/USDT", "SOL/USDT"])
@@ -41,7 +44,11 @@ class ExchangeTab(QWidget):
         self.sell_button.clicked.connect(lambda: self.place_order("Sell"))
         self.top_controls.addWidget(self.sell_button)
 
-        self.layout().addLayout(self.top_controls)
+        # Add top controls directly at the top
+        layout.addLayout(self.top_controls)
+
+        # Filler to push everything to the top
+        layout.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
         # Initial toggle state
         self.toggle_price_input("Market")
@@ -68,8 +75,3 @@ class ExchangeTab(QWidget):
             f"{side} Order",
             f"{side}ing {amount} of {pair} as a {order_type} order on {self.exchange}."
         )
-
-
-# This creates a dictionary of exchange_name: tab_instance
-def create_exchange_tabs(exchanges):
-    return {ex: ExchangeTab(ex) for ex in exchanges}
