@@ -1,14 +1,12 @@
-from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget
-import sys
-import os
-import json
-
+from PyQt6.QtWidgets import QMainWindow, QApplication, QTabWidget
 from ui.dashboard import DashboardTab
 from ui.settings import SettingsTab
 from ui.exchange_tabs import ExchangeTab
+import sys
+import json
+import os
 
-CONFIG_PATH = "config"
-USER_PREFS_FILE = os.path.join(CONFIG_PATH, "user_prefs.json")
+CONFIG_PATH = "config/user_prefs.json"
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -19,42 +17,41 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
 
-        # Dashboard tab first
-        self.dashboard = DashboardTab()
-        self.tabs.addTab(self.dashboard, "Dashboard")
-
-        # Placeholder for exchange tabs, to be populated below
-        self.exchange_tabs = {}
-
-        # Settings tab last, with callback to refresh exchanges
+        self.dashboard_tab = DashboardTab()
         self.settings = SettingsTab(on_exchanges_updated=self.refresh_exchanges)
-        self.tabs.addTab(self.settings, "Settings")
 
-        # Initial load of exchange tabs
+        # Load exchanges from user preferences
+        self.exchange_tabs = {}
         self.refresh_exchanges()
 
-        self.tabs.setCurrentIndex(0)  # Start on Dashboard
+        # Add Dashboard first, then exchanges, then settings
+        self.tabs.insertTab(0, self.dashboard_tab, "Dashboard")
+        self.tabs.insertTab(999, self.settings, "Settings")  # Will always go last
+
+        self.tabs.setCurrentIndex(0)
 
     def refresh_exchanges(self):
-        # Remove all tabs between Dashboard (index 0) and Settings (last)
-        while self.tabs.count() > 2:
-            self.tabs.removeTab(1)
+        # Remove all current exchange tabs
+        for name, tab in self.exchange_tabs.items():
+            index = self.tabs.indexOf(tab)
+            if index != -1:
+                self.tabs.removeTab(index)
 
-        # Load selected exchanges from config
-        selected_exchanges = []
-        if os.path.exists(USER_PREFS_FILE):
-            try:
-                with open(USER_PREFS_FILE, 'r') as f:
-                    prefs = json.load(f)
-                    selected_exchanges = prefs.get("enabled_exchanges", [])
-            except Exception as e:
-                print(f"Error loading user preferences: {e}")
+        self.exchange_tabs.clear()
 
-        # Create new ExchangeTabs for selected exchanges
-        for ex in selected_exchanges:
+        # Load enabled exchanges from config
+        if os.path.exists(CONFIG_PATH):
+            with open(CONFIG_PATH, 'r') as f:
+                config = json.load(f)
+                enabled_exchanges = config.get("enabled_exchanges", [])
+        else:
+            enabled_exchanges = []
+
+        # Recreate exchange tabs
+        for ex in enabled_exchanges:
             tab = ExchangeTab(ex)
             self.exchange_tabs[ex] = tab
-            self.tabs.insertTab(self.tabs.count() - 1, tab, ex)
+            self.tabs.insertTab(1, tab, ex)  # Insert after Dashboard
 
 def run_app():
     app = QApplication(sys.argv)
@@ -62,5 +59,3 @@ def run_app():
     window.show()
     sys.exit(app.exec())
 
-if __name__ == "__main__":
-    run_app()
