@@ -189,17 +189,35 @@ class SettingsTab(QWidget):
             secret = api_secret_input.text().strip()
             if not new_sub or not key or not secret:
                 return
+        
+            # Update API keys
             if new_sub != subaccount:
                 self.api_data[exchange].pop(subaccount, None)
             self.api_data[exchange][new_sub] = {"api_key": key, "api_secret": secret}
             with open(API_KEYS_PATH, 'w') as f:
                 json.dump(self.api_data, f, indent=2)
-
+        
+            # Ensure user_prefs has structure for this subaccount
+            if "subaccount_settings" not in self.user_prefs:
+                self.user_prefs["subaccount_settings"] = {}
+            if exchange not in self.user_prefs["subaccount_settings"]:
+                self.user_prefs["subaccount_settings"][exchange] = {}
+            if new_sub not in self.user_prefs["subaccount_settings"][exchange]:
+                self.user_prefs["subaccount_settings"][exchange][new_sub] = {
+                    "last_pair": "BTC/USDT"
+                }
+            with open(CONFIG_PATH, 'w') as f:
+                json.dump(self.user_prefs, f, indent=2)
+        
+            # Refresh UI state
             self.active_edit = None
             self.set_controls_enabled(True)
             self.render_exchange_sections()
+        
+            # Notify other tabs
             if self.on_exchanges_updated:
                 self.on_exchanges_updated()
+
 
         def edit():
             self.active_edit = (exchange, subaccount)
