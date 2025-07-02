@@ -1,56 +1,123 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox,
-    QGroupBox, QGridLayout, QLineEdit, QMessageBox, QScrollArea, QHBoxLayout,
-    QFormLayout, QDialog, QListWidget, QListWidgetItem
+    QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QMessageBox,
+    QScrollArea, QHBoxLayout, QFormLayout, QDialog,
+    QDialogButtonBox, QGroupBox, QToolButton, QSizePolicy, QCheckBox
 )
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
 import json
 import os
 
 CONFIG_PATH = "config/user_prefs.json"
 API_KEYS_PATH = "config/api_keys.json"
-
 SUPPORTED_EXCHANGES = [
     "Bybit", "Kraken", "Binance", "KuCoin", "Coinbase", "MEXC",
     "Bitget", "Crypto.com", "Hyperliquid"
 ]
 
-class ExchangeSelectorDialog(QDialog):
-    def __init__(self, parent, selected_exchanges):
-        super().__init__(parent)
+class ExchangeSelectionDialog(QDialog):
+    def __init__(self, selected_exchanges):
+        super().__init__()
         self.setWindowTitle("Choose Exchanges")
-        self.setLayout(QVBoxLayout())
-        self.selected_exchanges = selected_exchanges.copy()
+        self.setMinimumWidth(300)
+        self.selected_exchanges = selected_exchanges
 
-        self.list_widget = QListWidget()
-        self.list_widget.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
+        layout = QVBoxLayout()
+        self.checkboxes = []
+
+        layout.addWidget(QLabel("Select exchanges to enable:"))
         for ex in SUPPORTED_EXCHANGES:
-            item = QListWidgetItem(ex)
-            item.setSelected(ex in selected_exchanges)
-            self.list_widget.addItem(item)
-        self.layout().addWidget(self.list_widget)
+            checkbox = QCheckBox(ex)
+            checkbox.setChecked(ex in selected_exchanges)
+            self.checkboxes.append(checkbox)
+            layout.addWidget(checkbox)
 
-        confirm_layout = QHBoxLayout()
-        confirm_layout.addWidget(QLabel("Confirm?"))
-        yes_btn = QPushButton("Yes")
-        no_btn = QPushButton("No")
-        confirm_layout.addWidget(yes_btn)
-        confirm_layout.addWidget(no_btn)
-        self.layout().addLayout(confirm_layout)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
 
-        yes_btn.clicked.connect(self.accept)
-        no_btn.clicked.connect(self.reject)
+        layout.addWidget(QLabel("Confirm?"))
+        layout.addWidget(buttons)
+        self.setLayout(layout)
 
     def get_selected(self):
-        return [self.list_widget.item(i).text() for i in range(self.list_widget.count()) if self.list_widget.item(i).isSelected()]
+        return [cb.text() for cb in self.checkboxes if cb.isChecked()]
+
+class CollapsibleBox(QWidget):
+    def __init__(self, title):
+        super().__init__()
+        self.toggle_button = QToolButton()
+        self.toggle_button.setStyleSheet("text-align: left; font-weight: bold;")
+        self.toggle_button.setText(title)
+        self.toggle_button.setCheckable(True)
+        self.toggle_button.setChecked(True)
+        self.toggle_button.setArrowType(Qt.ArrowType.DownArrow)
+        self.toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.toggle_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.toggle_button.clicked.connect(self.toggle)
+
+        self.content_area = QWidget()
+        self.content_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
+        self.content_layout = QVBoxLayout()
+        self.content_layout.setContentsMargins(10, 0, 0, 0)
+        self.content_area.setLayout(self.content_layout)
+
+        self.toggle_animation = QPropertyAnimation(self.content_area, b"maximumHeight")
+        self.toggle_animation.setDuration(150)
+        self.toggle_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
+
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.addWidget(self.toggle_button)
+        self.main_layout.addWidget(self.content_area)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.setSpacing(0)
+        self.setLayout(self.main_layout)
+
+        self.expanded_height = 0
+        self.is_expanded = True
+        self.locked = False
+
+    def add_widget(self, widget):
+        self.content_layout.addWidget(widget)
+        self.expanded_height += widget.sizeHint().height() + 10
+        if self.is_expanded:
+            self.content_area.setMaximumHeight(self.expanded_height)
+
+    def toggle(self):
+        if self.locked:
+            return
+        self.is_expanded = not self.is_expanded
+        self.toggle_button.setArrowType(Qt.ArrowType.DownArrow if self.is_expanded else Qt.ArrowType.RightArrow)
+        new_height = self.expanded_height if self.is_expanded else 0
+        self.toggle_animation.stop()
+        self.toggle_animation.setStartValue(self.content_area.maximumHeight())
+        self.toggle_animation.setEndValue(new_height)
+        self.toggle_animation.start()
+
+    def lock_toggle(self):
+        self.locked = True
+        self.toggle_button.setEnabled(False)
+        self.toggle_button.setStyleSheet("text-align: left; font-weight: bold; color: gray;")
+
+    def unlock_toggle(self):
+        self.locked = False
+        self.toggle_button.setEnabled(True)
+        self.toggle_button.setStyleSheet("text-align: left; font-weight: bold;")
 
 class SettingsTab(QWidget):
     def __init__(self, on_exchanges_updated=None):
         super().__init__()
         self.on_exchanges_updated = on_exchanges_updated
+        self.active_edit = None
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         self.container = QWidget()
         self.container.setLayout(QVBoxLayout())
+
+        self.user_prefs = self.load_config()
+        self.api_data = self.load_api_keys()
+        self.selected_exchanges = self.user_prefs.get("enabled_exchanges", [])
 
         self.choose_btn = QPushButton("Choose Exchanges")
         self.choose_btn.clicked.connect(self.choose_exchanges)
@@ -66,20 +133,17 @@ class SettingsTab(QWidget):
         layout.addWidget(scroll)
         self.setLayout(layout)
 
-        self.user_prefs = self.load_config()
-        self.api_data = self.load_api_keys()
-        self.selected_exchanges = self.user_prefs.get("enabled_exchanges", [])
-
         self.render_exchange_sections()
 
-    def choose_exchanges(self):
-        dialog = ExchangeSelectorDialog(self, self.selected_exchanges)
-        if dialog.exec():
-            self.selected_exchanges = dialog.get_selected()
-            self.save_config()
-            self.render_exchange_sections()
-            if self.on_exchanges_updated:
-                self.on_exchanges_updated()
+    def set_controls_enabled(self, enabled):
+        self.choose_btn.setEnabled(enabled)
+        for i in range(self.api_layout.count()):
+            box = self.api_layout.itemAt(i).widget()
+            if isinstance(box, CollapsibleBox):
+                if enabled:
+                    box.unlock_toggle()
+                else:
+                    box.lock_toggle()
 
     def render_exchange_sections(self):
         for i in reversed(range(self.api_layout.count())):
@@ -88,95 +152,45 @@ class SettingsTab(QWidget):
                 widget.setParent(None)
 
         for ex in self.selected_exchanges:
-            ex_group = QGroupBox(ex)
-            ex_layout = QVBoxLayout()
+            exchange_box = CollapsibleBox(ex)
             subaccounts = self.api_data.get(ex, {})
+
             for subaccount, creds in subaccounts.items():
-                ex_layout.addLayout(self.create_subaccount_form(ex, subaccount, creds))
+                self.build_subaccount_ui(exchange_box, ex, subaccount, creds)
 
-            add_btn = QPushButton(f"Add Subaccount to {ex}")
-            add_btn.clicked.connect(lambda _, e=ex: self.add_subaccount(e))
-            ex_layout.addWidget(add_btn)
-
-            ex_group.setLayout(ex_layout)
-            self.api_layout.addWidget(ex_group)
-
-    def create_subaccount_form(self, exchange, subaccount, creds):
-        layout = QFormLayout()
-        api_key = QLineEdit(creds.get("api_key", ""))
-        api_secret = QLineEdit(creds.get("api_secret", ""))
-        api_secret.setEchoMode(QLineEdit.EchoMode.Password)
-
-        save_btn = QPushButton("Save")
-        save_btn.setEnabled(False)
-        save_btn.setStyleSheet("background-color: lightgrey;")
-
-        def enable_save():
-            if api_key.text().strip():
-                save_btn.setEnabled(True)
-                save_btn.setStyleSheet("")
-            else:
-                save_btn.setEnabled(False)
-                save_btn.setStyleSheet("background-color: lightgrey;")
-
-        api_key.textChanged.connect(enable_save)
-        api_secret.textChanged.connect(enable_save)
-
-        def save():
-            key = api_key.text().strip()
-            secret = api_secret.text().strip()
-            if not key:
-                QMessageBox.warning(self, "Missing Info", "API key cannot be empty.")
-                return
-
-            self.api_data.setdefault(exchange, {})[subaccount] = {"api_key": key, "api_secret": secret}
-            self.save_api_keys()
-            QMessageBox.information(self, "Saved", f"Saved credentials for {subaccount} on {exchange}.")
-
-            if self.on_exchanges_updated:
-                self.on_exchanges_updated()
-
-        save_btn.clicked.connect(save)
-
-        row = QHBoxLayout()
-        row.addWidget(save_btn)
-        delete_btn = QPushButton("Delete")
-
-        def delete():
-            confirm = QMessageBox.question(self, "Confirm", f"Delete subaccount '{subaccount}'?")
-            if confirm == QMessageBox.StandardButton.Yes:
-                del self.api_data[exchange][subaccount]
-                self.save_api_keys()
-                self.render_exchange_sections()
-                if self.on_exchanges_updated:
-                    self.on_exchanges_updated()
-
-        delete_btn.clicked.connect(delete)
-        row.addWidget(delete_btn)
-
-        layout.addRow("Subaccount:", QLabel(subaccount))
-        layout.addRow("API Key:", api_key)
-        layout.addRow("API Secret:", api_secret)
-        layout.addRow(row)
-        return layout
+            add_sub_btn = QPushButton(f"Add Subaccount to {ex}")
+            add_sub_btn.setMinimumHeight(28)
+            add_sub_btn.setMinimumWidth(180)
+            add_sub_btn.setStyleSheet("color: grey;" if self.active_edit else "")
+            add_sub_btn.clicked.connect(lambda _, e=ex: self.add_subaccount(e))
+            add_sub_btn.setEnabled(self.active_edit is None)
+            exchange_box.add_widget(add_sub_btn)
+            self.api_layout.addWidget(exchange_box)
 
     def add_subaccount(self, exchange):
-        count = len(self.api_data.get(exchange, {})) + 1
-        name = f"Sub{count}"
-        self.api_data.setdefault(exchange, {})[name] = {"api_key": "", "api_secret": ""}
-        self.save_api_keys()
-        self.render_exchange_sections()
-
-    def save_api_keys(self):
-        os.makedirs("config", exist_ok=True)
+        if self.active_edit is not None:
+            return
+        subaccount = f"Sub{len(self.api_data.get(exchange, {})) + 1}"
+        if exchange not in self.api_data:
+            self.api_data[exchange] = {}
+        self.api_data[exchange][subaccount] = {"api_key": "", "api_secret": ""}
         with open(API_KEYS_PATH, 'w') as f:
             json.dump(self.api_data, f, indent=2)
+        self.render_exchange_sections()
+        if self.on_exchanges_updated:
+            self.on_exchanges_updated()
 
-    def save_config(self):
-        os.makedirs("config", exist_ok=True)
-        self.user_prefs["enabled_exchanges"] = self.selected_exchanges
-        with open(CONFIG_PATH, 'w') as f:
-            json.dump(self.user_prefs, f, indent=2)
+    def choose_exchanges(self):
+        dialog = ExchangeSelectionDialog(self.selected_exchanges)
+        if dialog.exec():
+            selected = dialog.get_selected()
+            self.selected_exchanges = selected
+            os.makedirs("config", exist_ok=True)
+            with open(CONFIG_PATH, 'w') as f:
+                json.dump({"enabled_exchanges": selected}, f, indent=2)
+            self.render_exchange_sections()
+            if self.on_exchanges_updated:
+                self.on_exchanges_updated()
 
     def load_config(self):
         if os.path.exists(CONFIG_PATH):
