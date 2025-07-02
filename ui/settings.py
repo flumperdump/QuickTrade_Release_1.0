@@ -44,131 +44,145 @@ class ExchangeSelectorDialog(QDialog):
         return [self.list_widget.item(i).text() for i in range(self.list_widget.count()) if self.list_widget.item(i).isSelected()]
 
 class SettingsTab(QWidget):
-    def __init__(self):
+    def __init__(self, on_exchanges_updated=None):
         super().__init__()
+        self.on_exchanges_updated = on_exchanges_updated
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        container = QWidget()
-        container.setLayout(QVBoxLayout())
+        self.container = QWidget()
+        self.container.setLayout(QVBoxLayout())
 
-        choose_btn = QPushButton("Choose Exchanges")
-        choose_btn.clicked.connect(self.choose_exchanges)
-        container.layout().addWidget(choose_btn)
-
-        self.exchanges_box = QGroupBox("Enabled Exchanges")
-        self.ex_layout = QVBoxLayout()
-        self.checkboxes = {}
-
-        for ex in SUPPORTED_EXCHANGES:
-            cb = QCheckBox(ex)
-            self.ex_layout.addWidget(cb)
-            self.checkboxes[ex] = cb
-        self.exchanges_box.setLayout(self.ex_layout)
-
-        self.save_ex_btn = QPushButton("Save Exchange Selection")
-        self.save_ex_btn.clicked.connect(self.save_exchanges)
-
-        container.layout().addWidget(self.exchanges_box)
-        container.layout().addWidget(self.save_ex_btn)
+        self.choose_btn = QPushButton("Choose Exchanges")
+        self.choose_btn.clicked.connect(self.choose_exchanges)
+        self.container.layout().addWidget(self.choose_btn)
 
         self.api_box = QGroupBox("Manage API Keys")
         self.api_layout = QVBoxLayout()
-        self.api_forms = {}
-        self.api_data = self.load_api_keys()
-
-        for ex in SUPPORTED_EXCHANGES:
-            if ex in self.api_data:
-                exchange_box = QGroupBox(ex)
-                exchange_box.setCheckable(True)
-                exchange_box.setChecked(True)
-                exchange_layout = QVBoxLayout()
-
-                for subaccount, creds in self.api_data[ex].items():
-                    sub_box = QGroupBox(subaccount)
-                    sub_box.setCheckable(True)
-                    sub_box.setChecked(True)
-                    sub_layout = QFormLayout()
-
-                    api_key_input = QLineEdit(creds.get("api_key", ""))
-                    api_secret_input = QLineEdit(creds.get("api_secret", ""))
-                    api_secret_input.setEchoMode(QLineEdit.EchoMode.Password)
-
-                    save_btn = QPushButton("Save")
-                    save_btn.clicked.connect(lambda _, e=ex, s=subaccount, k=api_key_input, sec=api_secret_input: self.save_api(e, s, k, sec))
-
-                    sub_layout.addRow("API Key:", api_key_input)
-                    sub_layout.addRow("API Secret:", api_secret_input)
-                    sub_layout.addRow(save_btn)
-                    sub_box.setLayout(sub_layout)
-
-                    exchange_layout.addWidget(sub_box)
-
-                add_sub_btn = QPushButton(f"Add Subaccount to {ex}")
-                add_sub_btn.clicked.connect(lambda _, e=ex: self.add_subaccount(e))
-                exchange_layout.addWidget(add_sub_btn)
-                exchange_box.setLayout(exchange_layout)
-                self.api_layout.addWidget(exchange_box)
-
         self.api_box.setLayout(self.api_layout)
-        container.layout().addWidget(self.api_box)
+        self.container.layout().addWidget(self.api_box)
 
-        scroll.setWidget(container)
+        scroll.setWidget(self.container)
         layout = QVBoxLayout()
         layout.addWidget(scroll)
         self.setLayout(layout)
 
-        self.load_config()
+        self.user_prefs = self.load_config()
+        self.api_data = self.load_api_keys()
+        self.selected_exchanges = self.user_prefs.get("enabled_exchanges", [])
+
+        self.render_exchange_sections()
 
     def choose_exchanges(self):
-        current = [ex for ex, cb in self.checkboxes.items() if cb.isChecked()]
-        dialog = ExchangeSelectorDialog(self, current)
+        dialog = ExchangeSelectorDialog(self, self.selected_exchanges)
         if dialog.exec():
-            selected = dialog.get_selected()
-            for ex, cb in self.checkboxes.items():
-                cb.setChecked(ex in selected)
-            self.save_exchanges()
+            self.selected_exchanges = dialog.get_selected()
+            self.save_config()
+            self.render_exchange_sections()
+            if self.on_exchanges_updated:
+                self.on_exchanges_updated()
 
-    def save_api(self, exchange, subaccount, key_input, secret_input):
-        key = key_input.text().strip()
-        secret = secret_input.text().strip()
+    def render_exchange_sections(self):
+        for i in reversed(range(self.api_layout.count())):
+            widget = self.api_layout.itemAt(i).widget()
+            if widget:
+                widget.setParent(None)
 
-        if not key or not secret:
-            QMessageBox.warning(self, "Missing Info", "API key and secret cannot be empty.")
-            return
+        for ex in self.selected_exchanges:
+            ex_group = QGroupBox(ex)
+            ex_layout = QVBoxLayout()
+            subaccounts = self.api_data.get(ex, {})
+            for subaccount, creds in subaccounts.items():
+                ex_layout.addLayout(self.create_subaccount_form(ex, subaccount, creds))
 
-        os.makedirs("config", exist_ok=True)
-        if exchange not in self.api_data:
-            self.api_data[exchange] = {}
+            add_btn = QPushButton(f"Add Subaccount to {ex}")
+            add_btn.clicked.connect(lambda _, e=ex: self.add_subaccount(e))
+            ex_layout.addWidget(add_btn)
 
-        self.api_data[exchange][subaccount] = {"api_key": key, "api_secret": secret}
-        with open(API_KEYS_PATH, 'w') as f:
-            json.dump(self.api_data, f, indent=2)
+            ex_group.setLayout(ex_layout)
+            self.api_layout.addWidget(ex_group)
 
-        QMessageBox.information(self, "Saved", f"API keys for {exchange} → {subaccount} saved.")
+    def create_subaccount_form(self, exchange, subaccount, creds):
+        layout = QFormLayout()
+        api_key = QLineEdit(creds.get("api_key", ""))
+        api_secret = QLineEdit(creds.get("api_secret", ""))
+        api_secret.setEchoMode(QLineEdit.EchoMode.Password)
+
+        save_btn = QPushButton("Save")
+        save_btn.setEnabled(False)
+        save_btn.setStyleSheet("background-color: lightgrey;")
+
+        def enable_save():
+            if api_key.text().strip():
+                save_btn.setEnabled(True)
+                save_btn.setStyleSheet("")
+            else:
+                save_btn.setEnabled(False)
+                save_btn.setStyleSheet("background-color: lightgrey;")
+
+        api_key.textChanged.connect(enable_save)
+        api_secret.textChanged.connect(enable_save)
+
+        def save():
+            key = api_key.text().strip()
+            secret = api_secret.text().strip()
+            if not key:
+                QMessageBox.warning(self, "Missing Info", "API key cannot be empty.")
+                return
+
+            self.api_data.setdefault(exchange, {})[subaccount] = {"api_key": key, "api_secret": secret}
+            self.save_api_keys()
+            QMessageBox.information(self, "Saved", f"Saved credentials for {subaccount} on {exchange}.")
+
+            if self.on_exchanges_updated:
+                self.on_exchanges_updated()
+
+        save_btn.clicked.connect(save)
+
+        row = QHBoxLayout()
+        row.addWidget(save_btn)
+        delete_btn = QPushButton("Delete")
+
+        def delete():
+            confirm = QMessageBox.question(self, "Confirm", f"Delete subaccount '{subaccount}'?")
+            if confirm == QMessageBox.StandardButton.Yes:
+                del self.api_data[exchange][subaccount]
+                self.save_api_keys()
+                self.render_exchange_sections()
+                if self.on_exchanges_updated:
+                    self.on_exchanges_updated()
+
+        delete_btn.clicked.connect(delete)
+        row.addWidget(delete_btn)
+
+        layout.addRow("Subaccount:", QLabel(subaccount))
+        layout.addRow("API Key:", api_key)
+        layout.addRow("API Secret:", api_secret)
+        layout.addRow(row)
+        return layout
 
     def add_subaccount(self, exchange):
-        subaccount = f"Sub{len(self.api_data.get(exchange, {})) + 1}"
-        if exchange not in self.api_data:
-            self.api_data[exchange] = {}
-        self.api_data[exchange][subaccount] = {"api_key": "", "api_secret": ""}
+        count = len(self.api_data.get(exchange, {})) + 1
+        name = f"Sub{count}"
+        self.api_data.setdefault(exchange, {})[name] = {"api_key": "", "api_secret": ""}
+        self.save_api_keys()
+        self.render_exchange_sections()
+
+    def save_api_keys(self):
+        os.makedirs("config", exist_ok=True)
         with open(API_KEYS_PATH, 'w') as f:
             json.dump(self.api_data, f, indent=2)
-        QMessageBox.information(self, "Added", f"Subaccount {subaccount} added to {exchange}. Please refresh Settings tab to see changes.")
 
-    def save_exchanges(self):
-        selected = [ex for ex, cb in self.checkboxes.items() if cb.isChecked()]
+    def save_config(self):
         os.makedirs("config", exist_ok=True)
+        self.user_prefs["enabled_exchanges"] = self.selected_exchanges
         with open(CONFIG_PATH, 'w') as f:
-            json.dump({"enabled_exchanges": selected}, f, indent=2)
-        QMessageBox.information(self, "Saved", "Exchange selection saved.")
+            json.dump(self.user_prefs, f, indent=2)
 
     def load_config(self):
         if os.path.exists(CONFIG_PATH):
             with open(CONFIG_PATH, 'r') as f:
-                data = json.load(f)
-                for ex in data.get("enabled_exchanges", []):
-                    if ex in self.checkboxes:
-                        self.checkboxes[ex].setChecked(True)
+                return json.load(f)
+        return {}
 
     def load_api_keys(self):
         if os.path.exists(API_KEYS_PATH):
