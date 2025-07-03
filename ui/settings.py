@@ -1,3 +1,5 @@
+... (previous content retained)
+
 class SettingsTab(QWidget):
     def __init__(self, on_exchanges_updated=None):
         super().__init__()
@@ -46,10 +48,8 @@ class SettingsTab(QWidget):
                 widget.setParent(None)
 
         for ex in self.selected_exchanges:
-            if ex not in self.api_data:
-                self.api_data[ex] = {}
             exchange_box = CollapsibleBox(ex)
-            subaccounts = self.api_data[ex]
+            subaccounts = self.api_data.get(ex, {})
 
             for subaccount, creds in subaccounts.items():
                 self.build_subaccount_ui(exchange_box, ex, subaccount, creds)
@@ -57,39 +57,10 @@ class SettingsTab(QWidget):
             add_sub_btn = QPushButton(f"Add Subaccount to {ex}")
             add_sub_btn.setMinimumHeight(28)
             add_sub_btn.setMinimumWidth(180)
-            add_sub_btn.clicked.connect(self.make_add_subaccount_fn(ex))
+            add_sub_btn.clicked.connect(lambda _, e=ex: self.add_subaccount(e))
             add_sub_btn.setEnabled(self.active_edit is None)
             exchange_box.add_widget(add_sub_btn)
             self.api_layout.addWidget(exchange_box)
-
-    def make_add_subaccount_fn(self, exchange):
-        return lambda: self.add_subaccount(exchange)
-
-    def choose_exchanges(self):
-        dialog = ExchangeSelectionDialog(self.selected_exchanges)
-        if dialog.exec():
-            selected = dialog.get_selected()
-            self.selected_exchanges = selected
-            for ex in selected:
-                self.api_data.setdefault(ex, {})
-            os.makedirs("config", exist_ok=True)
-            self.user_prefs["enabled_exchanges"] = selected
-            with open(CONFIG_PATH, 'w') as f:
-                json.dump(self.user_prefs, f, indent=2)
-            self.render_exchange_sections()
-            if self.on_exchanges_updated:
-                self.on_exchanges_updated()
-
-    def add_subaccount(self, exchange):
-        if self.active_edit is not None:
-            return
-        subaccount = f"Sub{len(self.api_data.get(exchange, {})) + 1}"
-        if exchange not in self.api_data:
-            self.api_data[exchange] = {}
-        self.api_data[exchange][subaccount] = {"api_key": "", "api_secret": ""}
-        with open(API_KEYS_PATH, 'w') as f:
-            json.dump(self.api_data, f, indent=2)
-        self.render_exchange_sections()
 
     def build_subaccount_ui(self, container, exchange, subaccount, creds):
         sub_box = QGroupBox()
@@ -127,13 +98,16 @@ class SettingsTab(QWidget):
             existing_prefs = self.load_config()
             existing_prefs.setdefault("enabled_exchanges", self.selected_exchanges)
             existing_prefs.setdefault("subaccount_settings", {})
+
             if exchange not in existing_prefs["subaccount_settings"]:
                 existing_prefs["subaccount_settings"][exchange] = {}
             existing_prefs["subaccount_settings"][exchange][new_sub] = {
                 "last_pair": "BTC/USDT"
             }
+
             with open(CONFIG_PATH, 'w') as f:
                 json.dump(existing_prefs, f, indent=2)
+
             self.user_prefs = existing_prefs
 
             self.active_edit = None
@@ -198,6 +172,29 @@ class SettingsTab(QWidget):
         sub_box.layout().addRow(row)
 
         container.add_widget(sub_box)
+
+    def choose_exchanges(self):
+        dialog = ExchangeSelectionDialog(self.selected_exchanges)
+        if dialog.exec():
+            selected = dialog.get_selected()
+            self.selected_exchanges = selected
+            os.makedirs("config", exist_ok=True)
+            with open(CONFIG_PATH, 'w') as f:
+                json.dump({"enabled_exchanges": selected}, f, indent=2)
+            self.render_exchange_sections()
+            if self.on_exchanges_updated:
+                self.on_exchanges_updated()
+
+    def add_subaccount(self, exchange):
+        if self.active_edit is not None:
+            return
+        subaccount = f"Sub{len(self.api_data.get(exchange, {})) + 1}"
+        if exchange not in self.api_data:
+            self.api_data[exchange] = {}
+        self.api_data[exchange][subaccount] = {"api_key": "", "api_secret": ""}
+        with open(API_KEYS_PATH, 'w') as f:
+            json.dump(self.api_data, f, indent=2)
+        self.render_exchange_sections()
 
     def load_config(self):
         if os.path.exists(CONFIG_PATH):
