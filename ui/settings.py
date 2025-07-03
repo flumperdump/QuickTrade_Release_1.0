@@ -161,11 +161,15 @@ class SettingsTab(QWidget):
 
         for ex in self.selected_exchanges:
             exchange_box = CollapsibleBox(ex)
-            subaccounts = self.api_data.get(ex, {})
-
+        
+            # Ensure empty dict if not initialized
+            if ex not in self.api_data:
+                self.api_data[ex] = {}
+            subaccounts = self.api_data[ex]
+        
             for subaccount, creds in subaccounts.items():
                 self.build_subaccount_ui(exchange_box, ex, subaccount, creds)
-
+        
             add_sub_btn = QPushButton(f"Add Subaccount to {ex}")
             add_sub_btn.setMinimumHeight(28)
             add_sub_btn.setMinimumWidth(180)
@@ -284,15 +288,23 @@ class SettingsTab(QWidget):
         sub_box.layout().addRow(row)
 
         container.add_widget(sub_box)
-
+        
     def choose_exchanges(self):
         dialog = ExchangeSelectionDialog(self.selected_exchanges)
         if dialog.exec():
             selected = dialog.get_selected()
             self.selected_exchanges = selected
             os.makedirs("config", exist_ok=True)
+            
+            # Ensure consistent user_prefs structure
+            self.user_prefs.setdefault("subaccount_settings", {})
+            for ex in selected:
+                self.user_prefs["subaccount_settings"].setdefault(ex, {})
+                self.api_data.setdefault(ex, {})
+    
             with open(CONFIG_PATH, 'w') as f:
-                json.dump({"enabled_exchanges": selected}, f, indent=2)
+                json.dump({"enabled_exchanges": selected, "subaccount_settings": self.user_prefs["subaccount_settings"]}, f, indent=2)
+    
             self.render_exchange_sections()
             if self.on_exchanges_updated:
                 self.on_exchanges_updated()
