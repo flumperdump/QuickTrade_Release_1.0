@@ -1,16 +1,57 @@
 {
   "theme": "dark",
   "enabled_exchanges": [
-    "Bybit",
-    "Kraken",
     "Binance",
+    "Kraken",
     "KuCoin",
-    "Coinbase",
+    "Bybit",
     "MEXC",
     "Bitget",
     "Crypto.com",
+    "Coinbase",
     "Hyperliquid"
   ],
-  "subaccount_settings": {},
-  "last_used": {}
+  "subaccount_settings": {
+    "Binance": {
+      "Main": {
+        "last_pair": "BTC/USDT"
+      },
+      "Bot1": {
+        "last_pair": "BTC/USDT"
+      }
+    },
+    "Kraken": {
+      "Main": {
+        "last_pair": "BTC/USDT"
+      }
+    },
+    "KuCoin": {
+      "Trading": {
+        "last_pair": "BTC/USDT"
+      }
+    }
+  },
+  "last_used": {
+    "Binance": {
+      "subaccount": "Main"
+    },
+    "Binance:Main": {
+      "pair": "BTC/USDT"
+    },
+    "Binance:Bot1": {
+      "pair": "BTC/USDT"
+    },
+    "Kraken": {
+      "subaccount": "Main"
+    },
+    "Kraken:Main": {
+      "pair": "BTC/USDT"
+    },
+    "KuCoin": {
+      "subaccount": "Trading"
+    },
+    "KuCoin:Trading": {
+      "pair": "BTC/USDT"
+    }
+  }
 }
