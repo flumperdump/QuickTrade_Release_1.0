@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QMessageBox,
     QScrollArea, QHBoxLayout, QFormLayout, QDialog, QDialogButtonBox,
-    QGroupBox, QToolButton, QSizePolicy, QCheckBox
+    QToolButton, QSizePolicy, QCheckBox
 )
 from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
 import json
@@ -92,16 +92,6 @@ class CollapsibleBox(QWidget):
         self.toggle_animation.setEndValue(new_height)
         self.toggle_animation.start()
 
-    def lock_toggle(self):
-        self.locked = True
-        self.toggle_button.setEnabled(False)
-        self.toggle_button.setStyleSheet("text-align: left; font-weight: bold; color: gray;")
-
-    def unlock_toggle(self):
-        self.locked = False
-        self.toggle_button.setEnabled(True)
-        self.toggle_button.setStyleSheet("text-align: left; font-weight: bold;")
-
 class SettingsTab(QWidget):
     def __init__(self, on_exchanges_updated=None):
         super().__init__()
@@ -129,15 +119,21 @@ class SettingsTab(QWidget):
         self.render_exchange_sections()
 
     def load_config(self):
-        if os.path.exists(CONFIG_PATH):
-            with open(CONFIG_PATH, 'r') as f:
-                return json.load(f)
+        try:
+            if os.path.exists(CONFIG_PATH):
+                with open(CONFIG_PATH, 'r') as f:
+                    return json.load(f)
+        except Exception as e:
+            print(f"Error loading config: {e}")
         return {}
 
     def load_api_keys(self):
-        if os.path.exists(API_KEYS_PATH):
-            with open(API_KEYS_PATH, 'r') as f:
-                return json.load(f)
+        try:
+            if os.path.exists(API_KEYS_PATH):
+                with open(API_KEYS_PATH, 'r') as f:
+                    return json.load(f)
+        except Exception as e:
+            print(f"Error loading API keys: {e}")
         return {}
 
     def choose_exchanges(self):
@@ -145,11 +141,26 @@ class SettingsTab(QWidget):
         if dialog.exec():
             self.selected_exchanges = dialog.get_selected()
             self.user_prefs["enabled_exchanges"] = self.selected_exchanges
-            with open(CONFIG_PATH, 'w') as f:
-                json.dump(self.user_prefs, f, indent=2)
+            self.save_config()
             self.render_exchange_sections()
             if self.on_exchanges_updated:
                 self.on_exchanges_updated()
+
+    def save_config(self):
+        try:
+            os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+            with open(CONFIG_PATH, 'w') as f:
+                json.dump(self.user_prefs, f, indent=2)
+        except Exception as e:
+            print(f"Error saving config: {e}")
+
+    def save_api_keys(self):
+        try:
+            os.makedirs(os.path.dirname(API_KEYS_PATH), exist_ok=True)
+            with open(API_KEYS_PATH, 'w') as f:
+                json.dump(self.api_data, f, indent=2)
+        except Exception as e:
+            print(f"Error saving API keys: {e}")
 
     def render_exchange_sections(self):
         for i in reversed(range(self.scroll_layout.count())):
@@ -192,8 +203,7 @@ class SettingsTab(QWidget):
             if new_name != name:
                 self.api_data[exchange].pop(name, None)
             self.api_data[exchange][new_name] = {"api_key": key, "api_secret": secret}
-            with open(API_KEYS_PATH, 'w') as f:
-                json.dump(self.api_data, f, indent=2)
+            self.save_api_keys()
             self.render_exchange_sections()
             if self.on_exchanges_updated:
                 self.on_exchanges_updated()
@@ -201,31 +211,29 @@ class SettingsTab(QWidget):
         def delete():
             if exchange in self.api_data and name in self.api_data[exchange]:
                 del self.api_data[exchange][name]
-                with open(API_KEYS_PATH, 'w') as f:
-                    json.dump(self.api_data, f, indent=2)
+                self.save_api_keys()
                 self.render_exchange_sections()
                 if self.on_exchanges_updated:
                     self.on_exchanges_updated()
 
-        save_btn.clicked.connect(save)
-        delete_btn.clicked.connect(delete)
-
-        row_layout = QHBoxLayout()
-        row_layout.addWidget(save_btn)
-        row_layout.addWidget(delete_btn)
+        row_btns = QHBoxLayout()
+        row_btns.addWidget(save_btn)
+        row_btns.addWidget(delete_btn)
 
         layout.addRow("Subaccount Name", name_input)
         layout.addRow("API Key", key_input)
         layout.addRow("API Secret", secret_input)
-        layout.addRow(row_layout)
+        layout.addRow(row_btns)
 
         container.add_widget(row)
 
     def add_subaccount_blank(self, exchange):
         if exchange not in self.api_data:
             self.api_data[exchange] = {}
-        new_name = f"Sub{len(self.api_data[exchange]) + 1}"
+        i = 1
+        while f"Sub{i}" in self.api_data[exchange]:
+            i += 1
+        new_name = f"Sub{i}"
         self.api_data[exchange][new_name] = {"api_key": "", "api_secret": ""}
-        with open(API_KEYS_PATH, 'w') as f:
-            json.dump(self.api_data, f, indent=2)
+        self.save_api_keys()
         self.render_exchange_sections()
