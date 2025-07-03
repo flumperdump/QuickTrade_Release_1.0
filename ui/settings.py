@@ -168,6 +168,9 @@ class SettingsTab(QWidget):
             exchange_box.add_widget(add_sub_btn)
             self.api_layout.addWidget(exchange_box)
 
+        if self.on_exchanges_updated:
+            self.on_exchanges_updated()
+
     def build_subaccount_ui(self, container, exchange, subaccount, creds):
         sub_box = QGroupBox()
         sub_box.setLayout(QFormLayout())
@@ -213,9 +216,6 @@ class SettingsTab(QWidget):
             self.set_controls_enabled(True)
             self.render_exchange_sections()
 
-            if self.on_exchanges_updated:
-                self.on_exchanges_updated()
-
         def edit():
             self.active_edit = (exchange, subaccount)
             self.set_controls_enabled(False)
@@ -239,8 +239,6 @@ class SettingsTab(QWidget):
                     self.active_edit = None
                     self.set_controls_enabled(True)
                     self.render_exchange_sections()
-                    if self.on_exchanges_updated:
-                        self.on_exchanges_updated()
 
         is_new = creds["api_key"] == "" and creds["api_secret"] == ""
         if is_new:
@@ -282,8 +280,6 @@ class SettingsTab(QWidget):
             with open(CONFIG_PATH, 'w') as f:
                 json.dump({"enabled_exchanges": selected}, f, indent=2)
             self.render_exchange_sections()
-            if self.on_exchanges_updated:
-                self.on_exchanges_updated()
 
     def add_subaccount(self, exchange):
         if self.active_edit is not None:
