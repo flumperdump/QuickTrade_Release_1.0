@@ -53,7 +53,7 @@ class CollapsibleBox(QWidget):
         self.toggle_button.setCheckable(True)
         self.toggle_button.setChecked(True)
         self.toggle_button.setArrowType(Qt.ArrowType.DownArrow)
-        self.toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.toggle_button.setToolButtonStyle(QToolButton.ToolButtonTextBesideIcon)
         self.toggle_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.toggle_button.clicked.connect(self.toggle)
 
@@ -168,7 +168,8 @@ class SettingsTab(QWidget):
             exchange_box.add_widget(add_sub_btn)
             self.api_layout.addWidget(exchange_box)
 
-        if self.on_exchanges_updated:
+        # Only call the callback if it exists and is not None
+        if callable(self.on_exchanges_updated):
             self.on_exchanges_updated()
 
     def build_subaccount_ui(self, container, exchange, subaccount, creds):
