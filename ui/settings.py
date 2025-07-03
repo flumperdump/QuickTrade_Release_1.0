@@ -160,6 +160,9 @@ class SettingsTab(QWidget):
                 widget.setParent(None)
 
         for ex in self.selected_exchanges:
+            if ex not in self.api_data:
+                self.api_data[ex] = {}
+
             exchange_box = CollapsibleBox(ex)
             subaccounts = self.api_data.get(ex, {})
 
@@ -290,8 +293,9 @@ class SettingsTab(QWidget):
             selected = dialog.get_selected()
             self.selected_exchanges = selected
             os.makedirs("config", exist_ok=True)
+            self.user_prefs["enabled_exchanges"] = selected
             with open(CONFIG_PATH, 'w') as f:
-                json.dump({"enabled_exchanges": selected}, f, indent=2)
+                json.dump(self.user_prefs, f, indent=2)
             self.render_exchange_sections()
             if self.on_exchanges_updated:
                 self.on_exchanges_updated()
