@@ -187,15 +187,30 @@ class SettingsTab(QWidget):
             new_sub = sub_name_input.text().strip()
             key = api_key_input.text().strip()
             secret = api_secret_input.text().strip()
+
             if not new_sub or not key or not secret:
+                QMessageBox.warning(self, "Incomplete Data", "All fields must be filled before saving.")
                 return
 
-            if new_sub != subaccount:
-                self.api_data[exchange].pop(subaccount, None)
-            self.api_data[exchange][new_sub] = {"api_key": key, "api_secret": secret}
-            with open(API_KEYS_PATH, 'w') as f:
-                json.dump(self.api_data, f, indent=2)
+            # Ensure the structure exists
+            if exchange not in self.api_data:
+                self.api_data[exchange] = {}
 
+            # Rename subaccount if needed
+            if new_sub != subaccount and subaccount in self.api_data[exchange]:
+                del self.api_data[exchange][subaccount]
+
+            self.api_data[exchange][new_sub] = {"api_key": key, "api_secret": secret}
+
+            # Save to api_keys.json
+            try:
+                with open(API_KEYS_PATH, 'w') as f:
+                    json.dump(self.api_data, f, indent=2)
+            except Exception as e:
+                QMessageBox.critical(self, "Error Saving", f"Failed to save API keys:\n{e}")
+                return
+
+            # Update user_prefs structure
             if "subaccount_settings" not in self.user_prefs:
                 self.user_prefs["subaccount_settings"] = {}
             if exchange not in self.user_prefs["subaccount_settings"]:
@@ -204,12 +219,19 @@ class SettingsTab(QWidget):
                 self.user_prefs["subaccount_settings"][exchange][new_sub] = {
                     "last_pair": "BTC/USDT"
                 }
-            with open(CONFIG_PATH, 'w') as f:
-                json.dump(self.user_prefs, f, indent=2)
 
+            try:
+                with open(CONFIG_PATH, 'w') as f:
+                    json.dump(self.user_prefs, f, indent=2)
+            except Exception as e:
+                QMessageBox.critical(self, "Error Saving", f"Failed to save user prefs:\n{e}")
+                return
+
+            # Reset edit state and rerender
             self.active_edit = None
             self.set_controls_enabled(True)
             self.render_exchange_sections()
+
             if self.on_exchanges_updated:
                 self.on_exchanges_updated()
 
