@@ -51,7 +51,7 @@ class CollapsibleBox(QWidget):
         self.toggle_button.setCheckable(True)
         self.toggle_button.setChecked(True)
         self.toggle_button.setArrowType(Qt.ArrowType.DownArrow)
-        self.toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.toggle_button.setToolButtonStyle(QToolButton.ToolButtonTextBesideIcon)
         self.toggle_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.toggle_button.clicked.connect(self.toggle)
 
@@ -103,6 +103,14 @@ class CollapsibleBox(QWidget):
         self.locked = False
         self.toggle_button.setEnabled(True)
         self.toggle_button.setStyleSheet("text-align: left; font-weight: bold;")
+
+    def reset_height(self):
+        self.expanded_height = sum(
+            self.content_layout.itemAt(i).widget().sizeHint().height() + 10
+            for i in range(self.content_layout.count())
+        )
+        if self.is_expanded:
+            self.content_area.setMaximumHeight(self.expanded_height)
 
 class SettingsTab(QWidget):
     def __init__(self, on_exchanges_updated=None):
@@ -164,6 +172,7 @@ class SettingsTab(QWidget):
             add_sub_btn.clicked.connect(lambda _, e=ex: self.add_subaccount(e))
             add_sub_btn.setEnabled(self.active_edit is None)
             exchange_box.add_widget(add_sub_btn)
+            exchange_box.reset_height()
             self.api_layout.addWidget(exchange_box)
 
     def build_subaccount_ui(self, container, exchange, subaccount, creds):
@@ -189,19 +198,17 @@ class SettingsTab(QWidget):
             secret = api_secret_input.text().strip()
             if not new_sub or not key or not secret:
                 return
-        
+
             if exchange not in self.api_data:
                 self.api_data[exchange] = {}
-        
+
             if new_sub != subaccount:
                 self.api_data[exchange].pop(subaccount, None)
-        
             self.api_data[exchange][new_sub] = {"api_key": key, "api_secret": secret}
             os.makedirs(os.path.dirname(API_KEYS_PATH), exist_ok=True)
             with open(API_KEYS_PATH, 'w') as f:
                 json.dump(self.api_data, f, indent=2)
-        
-            # Ensure user_prefs structure
+
             if "subaccount_settings" not in self.user_prefs:
                 self.user_prefs["subaccount_settings"] = {}
             if exchange not in self.user_prefs["subaccount_settings"]:
@@ -213,7 +220,7 @@ class SettingsTab(QWidget):
             os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
             with open(CONFIG_PATH, 'w') as f:
                 json.dump(self.user_prefs, f, indent=2)
-        
+
             self.active_edit = None
             self.set_controls_enabled(True)
             self.render_exchange_sections()
@@ -283,9 +290,8 @@ class SettingsTab(QWidget):
             selected = dialog.get_selected()
             self.selected_exchanges = selected
             os.makedirs("config", exist_ok=True)
-            self.user_prefs["enabled_exchanges"] = selected
             with open(CONFIG_PATH, 'w') as f:
-                json.dump(self.user_prefs, f, indent=2)
+                json.dump({"enabled_exchanges": selected}, f, indent=2)
             self.render_exchange_sections()
             if self.on_exchanges_updated:
                 self.on_exchanges_updated()
