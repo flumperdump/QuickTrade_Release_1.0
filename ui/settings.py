@@ -191,38 +191,41 @@ class SettingsTab(QWidget):
         edit_btn.setMinimumWidth(60)
         delete_btn.setMinimumWidth(60)
 
-        def save():
-            new_sub = sub_name_input.text().strip()
-            key = api_key_input.text().strip()
-            secret = api_secret_input.text().strip()
-            if not new_sub or not key or not secret:
-                QMessageBox.warning(self, "Missing Fields", "Please fill all fields to save.")
-                return
-
-            if exchange not in self.api_data:
-                self.api_data[exchange] = {}
-            if new_sub != subaccount:
-                self.api_data[exchange].pop(subaccount, None)
-            self.api_data[exchange][new_sub] = {"api_key": key, "api_secret": secret}
-            with open(API_KEYS_PATH, 'w') as f:
-                json.dump(self.api_data, f, indent=2)
-
-            if "subaccount_settings" not in self.user_prefs:
-                self.user_prefs["subaccount_settings"] = {}
-            if exchange not in self.user_prefs["subaccount_settings"]:
-                self.user_prefs["subaccount_settings"][exchange] = {}
-            if new_sub not in self.user_prefs["subaccount_settings"][exchange]:
-                self.user_prefs["subaccount_settings"][exchange][new_sub] = {
-                    "last_pair": "BTC/USDT"
-                }
-            with open(CONFIG_PATH, 'w') as f:
-                json.dump(self.user_prefs, f, indent=2)
-
-            self.active_edit = None
-            self.set_controls_enabled(True)
-            self.render_exchange_sections()
-            if self.on_exchanges_updated:
-                self.on_exchanges_updated()
+    def save():
+        new_sub = sub_name_input.text().strip()
+        key = api_key_input.text().strip()
+        secret = api_secret_input.text().strip()
+        if not new_sub or not key or not secret:
+            QMessageBox.warning(self, "Missing Fields", "Please fill all fields to save.")
+            return
+    
+        # Update API keys
+        if exchange not in self.api_data:
+            self.api_data[exchange] = {}
+        if new_sub != subaccount:
+            self.api_data[exchange].pop(subaccount, None)
+        self.api_data[exchange][new_sub] = {"api_key": key, "api_secret": secret}
+        with open(API_KEYS_PATH, 'w') as f:
+            json.dump(self.api_data, f, indent=2)
+    
+        # Safely update config without overwriting enabled_exchanges
+        existing_prefs = self.load_config()
+        existing_prefs.setdefault("enabled_exchanges", self.selected_exchanges)
+        existing_prefs.setdefault("subaccount_settings", {})
+        if exchange not in existing_prefs["subaccount_settings"]:
+            existing_prefs["subaccount_settings"][exchange] = {}
+        existing_prefs["subaccount_settings"][exchange][new_sub] = {
+            "last_pair": "BTC/USDT"
+        }
+        with open(CONFIG_PATH, 'w') as f:
+            json.dump(existing_prefs, f, indent=2)
+        self.user_prefs = existing_prefs
+    
+        self.active_edit = None
+        self.set_controls_enabled(True)
+        self.render_exchange_sections()
+        if self.on_exchanges_updated:
+            self.on_exchanges_updated()
 
         def edit():
             self.active_edit = (exchange, subaccount)
