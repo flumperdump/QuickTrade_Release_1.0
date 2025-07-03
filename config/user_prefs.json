@@ -1,4 +1,16 @@
 {
-    "theme": "dark",
-    "exchange": "Binance"
+  "theme": "dark",
+  "enabled_exchanges": [
+    "Bybit",
+    "Kraken",
+    "Binance",
+    "KuCoin",
+    "Coinbase",
+    "MEXC",
+    "Bitget",
+    "Crypto.com",
+    "Hyperliquid"
+  ],
+  "subaccount_settings": {},
+  "last_used": {}
 }
