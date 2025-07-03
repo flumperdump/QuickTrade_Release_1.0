@@ -1,13 +1,11 @@
-# settings.py (Final Fixed Full Version - 330+ Lines)
-
-import os
-import json
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QScrollArea, QPushButton, QLabel, QComboBox, QLineEdit,
-    QHBoxLayout, QMessageBox, QGroupBox, QSizePolicy, QSpacerItem, QCheckBox,
-    QFormLayout, QToolButton, QDialog, QDialogButtonBox
+    QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QMessageBox,
+    QScrollArea, QHBoxLayout, QFormLayout, QListWidget, QListWidgetItem, QDialog,
+    QDialogButtonBox, QGroupBox, QToolButton, QSizePolicy, QFrame, QCheckBox
 )
-from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QTimer
+import json
+import os
 
 CONFIG_PATH = "config/user_prefs.json"
 API_KEYS_PATH = "config/api_keys.json"
@@ -53,7 +51,7 @@ class CollapsibleBox(QWidget):
         self.toggle_button.setCheckable(True)
         self.toggle_button.setChecked(True)
         self.toggle_button.setArrowType(Qt.ArrowType.DownArrow)
-        self.toggle_button.setToolButtonStyle(QToolButton.ToolButtonTextBesideIcon)
+        self.toggle_button.setToolButtonStyle(QToolButton.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.toggle_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.toggle_button.clicked.connect(self.toggle)
 
@@ -135,7 +133,7 @@ class SettingsTab(QWidget):
         layout.addWidget(scroll)
         self.setLayout(layout)
 
-        self.render_exchange_sections()
+        QTimer.singleShot(0, self.render_exchange_sections)
 
     def set_controls_enabled(self, enabled):
         self.choose_btn.setEnabled(enabled)
