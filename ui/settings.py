@@ -160,9 +160,6 @@ class SettingsTab(QWidget):
                 widget.setParent(None)
 
         for ex in self.selected_exchanges:
-            if ex not in self.api_data:
-                self.api_data[ex] = {}
-
             exchange_box = CollapsibleBox(ex)
             subaccounts = self.api_data.get(ex, {})
 
@@ -175,7 +172,6 @@ class SettingsTab(QWidget):
             add_sub_btn.clicked.connect(lambda _, e=ex: self.add_subaccount(e))
             add_sub_btn.setEnabled(self.active_edit is None)
             exchange_box.add_widget(add_sub_btn)
-            exchange_box.reset_height()
             self.api_layout.addWidget(exchange_box)
 
     def build_subaccount_ui(self, container, exchange, subaccount, creds):
@@ -200,15 +196,14 @@ class SettingsTab(QWidget):
             key = api_key_input.text().strip()
             secret = api_secret_input.text().strip()
             if not new_sub or not key or not secret:
+                QMessageBox.warning(self, "Missing Fields", "Please fill all fields to save.")
                 return
 
             if exchange not in self.api_data:
                 self.api_data[exchange] = {}
-
             if new_sub != subaccount:
                 self.api_data[exchange].pop(subaccount, None)
             self.api_data[exchange][new_sub] = {"api_key": key, "api_secret": secret}
-            os.makedirs(os.path.dirname(API_KEYS_PATH), exist_ok=True)
             with open(API_KEYS_PATH, 'w') as f:
                 json.dump(self.api_data, f, indent=2)
 
@@ -220,7 +215,6 @@ class SettingsTab(QWidget):
                 self.user_prefs["subaccount_settings"][exchange][new_sub] = {
                     "last_pair": "BTC/USDT"
                 }
-            os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
             with open(CONFIG_PATH, 'w') as f:
                 json.dump(self.user_prefs, f, indent=2)
 
@@ -293,9 +287,8 @@ class SettingsTab(QWidget):
             selected = dialog.get_selected()
             self.selected_exchanges = selected
             os.makedirs("config", exist_ok=True)
-            self.user_prefs["enabled_exchanges"] = selected
             with open(CONFIG_PATH, 'w') as f:
-                json.dump(self.user_prefs, f, indent=2)
+                json.dump({"enabled_exchanges": selected}, f, indent=2)
             self.render_exchange_sections()
             if self.on_exchanges_updated:
                 self.on_exchanges_updated()
